@@ -10,6 +10,12 @@
 
 By unifying machine-checked Lie-algebraic anti-swap operators ($\mathfrak{so}(C)$), exterior-curl flux shielding, discrete mass continuity, and a whitened 3-point causal deferral gate, Stylo achieves **240–9,400+ FPS** single-core throughput within a fixed **$< 2.0\text{ MB}$** on-chip SRAM cache footprint—completely eliminating GPU dependencies, pretrained neural network weights, and DRAM bus stalls.
 
+![DarkSnail Tactical Studio — Scenario 03: Symmetric 4-Way Crossing Occlusion (`0` ID Swaps vs. Legacy Kalman/IoU)](docs/assets/studio_scenario03_crossing.png)
+*Figure 1 — **Scenario 03 (`03_symmetric_crossing_occlusion`):** Four identical-intensity targets colliding head-on at the center of a $128\times 128$ grid. **Quad A** overlays Tier-1 Beltrami exterior-curl reticles (cyan) and Tier-2 RoPE-2D medoid crosshairs (yellow); **Quad B** quarantines specular glare washouts and reversible clutter into $M_{\text{clock}}$ (amber) while isolating mass-conservative targets into $H_{\text{nope}}$ (emerald); **Quad C** demonstrates $\mathfrak{so}(C)$ skew-symmetric triad tie-breaking (`0` DarkSnail ID swaps vs. `4` legacy Kalman/IoU swaps); **Quad D** displays active causal generators ($G_{\text{act}}$, green stars) and live Theorem 2.1–2.7 verification.*
+
+![DarkSnail Tactical Studio — Scenario 04: 12-Target Decoy Swarm Factorization & HUD Clutter Quarantine](docs/assets/studio_scenario04_decoy_swarm.png)
+*Figure 2 — **Scenario 04 (`04_decoy_swarm_factorization`):** Twelve-target swarm maneuvering beneath a high-contrast scrolling HUD bar. Stage 2's continuity splitter quarantines the top HUD bar into $M_{\text{clock}}$, while Stage 4's non-local causal action ratio ($\eta_{\text{nonlocal}}$) partitions the **2 active maneuvering command vehicles ($G_{\text{act}}$, green stars in Quad D)** from the **10 slaved repeater decoys ($\Omega_{\text{reg}}$, red crosses with dashed slaved coupling lines)**.*
+
 ---
 
 ## Benchmark Breakdown: Nominal Coast vs. Active-Collision Torture
