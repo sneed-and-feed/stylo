@@ -59,8 +59,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .antenna import DarkSnailSchedule, ZenoAmygdalaController
-from .gemma4 import Gemma4BeltramiCallosalShell
+try:
+    from .antenna import DarkSnailSchedule, ZenoAmygdalaController
+except ImportError:
+    DarkSnailSchedule = None  # type: ignore[assignment,misc]
+    ZenoAmygdalaController = None  # type: ignore[assignment,misc]
+
+try:
+    from .gemma4 import Gemma4BeltramiCallosalShell
+except ImportError:
+    Gemma4BeltramiCallosalShell = None  # type: ignore[assignment,misc]
 from .readout import (
     RoPE2DMedoidPooler,
     SkewSymmetricTriadOperator,
