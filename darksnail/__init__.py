@@ -105,6 +105,10 @@ __all__ = [
     "discover_decoder_layers",
     "resolve_default_hook_layer",
     "build_isometric_haar_qr_bridge",
+    "DarkSnailHighSpeedTracker",
+    "TrackerConfig",
+    "InnovationSpikeGateConfig",
+    "verify_formal_theorems",
 ]
 
 from .arc3 import (
@@ -160,6 +164,12 @@ from .hooks import (
     build_isometric_haar_qr_bridge,
     discover_decoder_layers,
     resolve_default_hook_layer,
+)
+from .tracker import (
+    DarkSnailHighSpeedTracker,
+    InnovationSpikeGateConfig,
+    TrackerConfig,
+    verify_formal_theorems,
 )
 
 

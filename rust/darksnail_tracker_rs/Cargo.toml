@@ -1,0 +1,18 @@
+[package]
+name = "darksnail_tracker_rs"
+version = "0.1.0"
+edition = "2021"
+description = "Allocation-free #![no_std] Rust SIMD and WASM high-speed video tracking kernel"
+license = "CC0-1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
