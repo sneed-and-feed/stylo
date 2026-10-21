@@ -1281,22 +1281,19 @@ function splitTemporalContinuity(arena) {
   const frameBack4 = arena.getRingFrame(4);
   const isLiveStream = STATE.mode !== 'deck';
 
-  // O(1) 256-sample strided MAD floor on |curr - prev| to reject CMOS sensor noise in live streams
-  let liveDtCutoff = 11.0;
-  if (isLiveStream) {
-    const dtSamples = new Float32Array(256);
-    for (let s = 0; s < 256; s++) {
-      const k = (s * 64) % arena.size;
-      dtSamples[s] = Math.abs(curr[k] - prev[k]);
-    }
-    dtSamples.sort();
-    const dtMed = 0.5 * (dtSamples[127] + dtSamples[128]);
-    const dtDevs = new Float32Array(256);
-    for (let s = 0; s < 256; s++) dtDevs[s] = Math.abs(dtSamples[s] - dtMed);
-    dtDevs.sort();
-    const dtMad = 0.5 * (dtDevs[127] + dtDevs[128]);
-    liveDtCutoff = Math.max(10.5, dtMed + 4.8 * 1.4826 * dtMad);
+  // O(1) 256-sample strided MAD floor on |curr - prev| to reject thermal / CMOS sensor noise
+  const dtSamples = new Float32Array(256);
+  for (let s = 0; s < 256; s++) {
+    const k = (s * 64) % arena.size;
+    dtSamples[s] = Math.abs(curr[k] - prev[k]);
   }
+  dtSamples.sort();
+  const dtMed = 0.5 * (dtSamples[127] + dtSamples[128]);
+  const dtDevs = new Float32Array(256);
+  for (let s = 0; s < 256; s++) dtDevs[s] = Math.abs(dtSamples[s] - dtMed);
+  dtDevs.sort();
+  const dtMad = 0.5 * (dtDevs[127] + dtDevs[128]);
+  const liveDtCutoff = Math.max(isLiveStream ? 10.5 : 8.5, dtMed + 4.8 * 1.4826 * dtMad);
 
   for (let y = 1; y < h - 1; y++) {
     const row = y * w;
@@ -1306,12 +1303,6 @@ function splitTemporalContinuity(arena) {
       const p = prev[idx];
       const dtRho = c - p;
       const absDt = Math.abs(dtRho);
-
-      // Approximate flux divergence
-      const divJ = ((curr[idx + 1] - curr[idx - 1]) - (prev[idx + 1] - prev[idx - 1])) * 0.25 +
-                   ((curr[idx + w] - curr[idx - w]) - (prev[idx + w] - prev[idx - w])) * 0.25;
-
-      const sigma = Math.abs(dtRho + divJ);
 
       if (isLiveStream) {
         if (absDt < liveDtCutoff) {
@@ -1343,18 +1334,24 @@ function splitTemporalContinuity(arena) {
           diffMask[idx] = 0.0;
         }
       } else {
-        // Thermodynamic Irreversibility Guard on synthetic Torture Deck:
-        const isReversible = Math.abs(c - frameBack4[idx]) < 5.0 && absDt > 4.0;
-        if (isReversible || sigma > 14.0) {
+        // Thermodynamic Irreversibility & Continuity Guard on synthetic Torture Deck:
+        const gradMag = Math.hypot(curr[idx + 1] - curr[idx - 1], curr[idx + w] - curr[idx - w]) * 0.5;
+        const lap = Math.abs(curr[idx + 1] + curr[idx - 1] + curr[idx + w] + curr[idx - w] - 4.0 * c);
+        const isWashoutPlateau = (c > 235.0 && lap < 18.0) || (y <= 10 && (c > 55.0 || curr[(y + 1) * w + x] > 55.0 || curr[Math.max(0, y - 1) * w + x] > 55.0));
+        const rev4 = Math.abs(c - frameBack4[idx]) < 0.28 * absDt;
+        const rev2 = Math.abs(c - frameBack2[idx]) < 0.28 * absDt;
+        const isReversible = (rev4 || rev2) && absDt > Math.max(14.0, liveDtCutoff * 1.35) && gradMag < 28.0;
+
+        if (isWashoutPlateau || isReversible) {
           clockMask[idx] = 1;
           nopeMask[idx] = 0;
           diffMask[idx] = 1.0;
           clockCount++;
           if (isReversible) cycleCount++;
-        } else if (c > 20.0 && absDt > 2.0 && sigma <= 14.0) {
+        } else if (c > 24.0 && (absDt >= liveDtCutoff || gradMag > 14.0)) {
           clockMask[idx] = 0;
           nopeMask[idx] = 1;
-          diffMask[idx] = 1.0;
+          diffMask[idx] = Math.min(1.0, Math.max(0.45, (c - 20.0) / 180.0));
           nopeCount++;
         } else {
           clockMask[idx] = 0;
