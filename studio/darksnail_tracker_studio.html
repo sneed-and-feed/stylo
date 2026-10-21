@@ -703,7 +703,8 @@ footer {
 <!-- Secondary Toolbar for Mode 3 (File Scrub / Replay) -->
 <div class="sub-bar" id="sub-bar-file" style="display:none;">
   <div class="scrub-timeline">
-    <button class="btn" style="padding:2px 8px; font-size:10px;" onclick="filePlayToggle()">▶ PLAY</button>
+    <button class="btn" id="file-play-btn" style="padding:2px 8px; font-size:10px;" onclick="filePlayToggle()">⏸ PAUSE</button>
+    <button class="btn" style="padding:2px 8px; font-size:10px;" onclick="document.getElementById('file-input').click()">📂 LOAD VIDEO / .Y8</button>
     <span>FRAME: <span id="file-frame-cur" style="color:var(--cyan);">0</span> / <span id="file-frame-tot">0</span></span>
     <input type="range" id="file-scrubber" min="0" max="100" value="0" style="flex:1;" oninput="scrubFileFrame(this.value)">
     <span class="badge" id="file-format-badge">NO FILE LOADED</span>
@@ -828,13 +829,13 @@ footer {
   <div class="dropzone-box" id="dropzone-area" onclick="document.getElementById('file-input').click()">
     <div style="font-size:32px;">📥</div>
     <div style="font-family:var(--font-mono); font-weight:700; color:var(--text-bright);">
-      DROP .MP4 / .WEBM / .Y8 ARRAYBUFFER HERE
+      DROP VIDEO (.MP4 / .WEBM / .MOV) OR .Y8 ARRAYBUFFER HERE
     </div>
     <div style="font-size:11px; color:var(--text-muted);">
       Drag and drop high-speed video files or raw 8-bit Y8 binary arrays for 240+ Hz frame-by-frame scrub
     </div>
     <button class="btn" style="margin-top:6px;">SELECT LOCAL FILE</button>
-    <input type="file" id="file-input" class="hidden-file-input" accept=".mp4,.webm,.y8,.bin" onchange="handleFileSelect(event)">
+    <input type="file" id="file-input" class="hidden-file-input" accept="video/*,.mp4,.webm,.mov,.m4v,.mkv,.avi,.ogv,.ogg,.y8,.bin,.raw" onchange="handleFileSelect(event)">
   </div>
   <button class="btn" style="margin-top:16px;" onclick="setMode('deck')">← BACK TO TORTURE DECK</button>
 </div>
@@ -891,7 +892,8 @@ footer {
 
 <!-- Hidden Video & Offscreen Processing Elements -->
 <video id="webrtc-video" autoplay playsinline muted style="display:none;"></video>
-<video id="file-video" playsinline muted style="display:none;"></video>
+<video id="file-video" playsinline muted loop preload="auto" style="display:none;"></video>
+<canvas id="offscreen-video-canvas" width="128" height="128" style="display:none;"></canvas>
 
 <!-- =========================================================================
      DARKSNAIL CLIENT-SIDE MATHEMATICAL ENGINE (100% Client-Side Pure JS / TypedArrays)
@@ -1086,10 +1088,12 @@ function extractBeltramiSpikesAndWashouts(arena) {
       const gradNormSq = dx * dx + dy * dy;
       const peakLap = Math.max(0.0, 4.0 * val - (curr[idx + 1] + curr[idx - 1] + curr[idx + w] + curr[idx - w]));
       const nopeWeight = arena.clockMask[idx] ? 0.0 : 1.0;
+      const motionBoost = (STATE.mode !== 'deck') ? Math.abs(dt) * 0.85 : 0.0;
       const salience = nopeWeight * (
         Math.sqrt(gradNormSq) * 0.45 +
         peakLap * 0.45 +
-        Math.max(0.0, val - 38.0) * 0.35
+        Math.max(0.0, val - 38.0) * 0.35 +
+        motionBoost
       );
 
       curl[idx] = salience;
@@ -1285,8 +1289,25 @@ function splitTemporalContinuity(arena) {
       // Thermodynamic Irreversibility Guard:
       // If pixel reverses state to frame t-4 within tolerance (cyclical swaying or 120Hz PWM flicker)
       const isReversible = Math.abs(c - frameBack4[idx]) < 5.0 && Math.abs(dtRho) > 4.0;
+      const isLiveStream = STATE.mode !== 'deck';
 
-      if (isReversible || sigma > 14.0) {
+      if (isLiveStream) {
+        // In live video / WebRTC streams, quarantine reversible cycles or uniform flicker without spatial divergence
+        const isUniformStrobe = Math.abs(dtRho) > 45.0 && Math.abs(divJ) < 3.5;
+        if (isReversible || isUniformStrobe) {
+          clockMask[idx] = 1;
+          nopeMask[idx] = 0;
+          clockCount++;
+          if (isReversible) cycleCount++;
+        } else if (c > 16.0 && (Math.abs(dtRho) > 2.0 || Math.abs(divJ) > 1.5)) {
+          clockMask[idx] = 0;
+          nopeMask[idx] = 1;
+          nopeCount++;
+        } else {
+          clockMask[idx] = 0;
+          nopeMask[idx] = 0;
+        }
+      } else if (isReversible || sigma > 14.0) {
         // Quarantined into M_clock (PWM strobe, scrolling HUD, foliage cycle)
         clockMask[idx] = 1;
         nopeMask[idx] = 0;
@@ -1452,8 +1473,15 @@ function factorizeCausalDecoys(tracks) {
     const accel = Math.sqrt(tr.ax * tr.ax + tr.ay * tr.ay);
 
     // Non-local causal ratio: autonomous maneuvering gives high non-local action eta
-    let eta = tr.isAutonomous ? 0.78 : 0.22;
-    if (speed < 0.2) eta = 0.15; // Stationary or slaved
+    let eta;
+    if (typeof tr.isAutonomous === 'boolean') {
+      eta = tr.isAutonomous ? 0.78 : 0.22;
+      if (speed < 0.2) eta = 0.15; // Stationary or slaved
+    } else {
+      // Live video / WebRTC kinematic non-local action ratio
+      const kinAction = speed * 0.55 + accel * 1.35;
+      eta = Math.min(0.94, Math.max(0.12, kinAction / (0.32 + kinAction)));
+    }
 
     tr.eta = eta;
     tr.isGenerator = eta >= 0.50;
@@ -1734,6 +1762,8 @@ function runDarkSnailTrackerStep(arena) {
   // Stage 3 & 4: Track association, tie-breaking, and kinematics
   const activeTracks = arena.tracks;
   const usedMedoids = new Uint8Array(medoidCount);
+  const isLiveStream = STATE.mode !== 'deck';
+  const assocRadius = isLiveStream ? 18.0 : 12.0;
 
   for (let i = 0; i < activeTracks.length; i++) {
     const tr = activeTracks[i];
@@ -1750,7 +1780,7 @@ function runDarkSnailTrackerStep(arena) {
       const med = arena.medoids[m];
       if (!med.active) continue;
       const dPred = Math.sqrt((med.x - predX)**2 + (med.y - predY)**2);
-      if (dPred < bestScore && dPred < 12.0) {
+      if (dPred < bestScore && dPred < assocRadius) {
         bestScore = dPred;
         bestIdx = m;
       }
@@ -1759,11 +1789,12 @@ function runDarkSnailTrackerStep(arena) {
     if (bestIdx >= 0) {
       const bestMedoid = arena.medoids[bestIdx];
       usedMedoids[bestIdx] = 1;
+      tr.missedFrames = 0;
       // Stage 1 Whitened Innovation Gate Check
       const gateResult = checkInnovationSpikeGate(arena, tr, bestMedoid.x, bestMedoid.y);
       if (gateResult.applyUpdate) {
-        tr.vx = 0.75 * tr.vx + 0.25 * (bestMedoid.x - tr.x);
-        tr.vy = 0.75 * tr.vy + 0.25 * (bestMedoid.y - tr.y);
+        tr.vx = 0.70 * tr.vx + 0.30 * (bestMedoid.x - tr.x);
+        tr.vy = 0.70 * tr.vy + 0.30 * (bestMedoid.y - tr.y);
         tr.x = bestMedoid.x;
         tr.y = bestMedoid.y;
       } else {
@@ -1772,8 +1803,13 @@ function runDarkSnailTrackerStep(arena) {
       }
     } else {
       // Ballistic coast through occlusion / washout
-      tr.x = predX;
-      tr.y = predY;
+      tr.missedFrames = (tr.missedFrames || 0) + 1;
+      if (isLiveStream) {
+        tr.vx *= 0.88;
+        tr.vy *= 0.88;
+      }
+      tr.x = tr.x + tr.vx;
+      tr.y = tr.y + tr.vy;
     }
 
     tr.ax = tr.vx - prevVx;
@@ -1785,6 +1821,64 @@ function runDarkSnailTrackerStep(arena) {
 
     // Stage 4: 1D Marginal Wasserstein-1 distance
     if (i === 0) computeMarginalWasserstein1(arena, tr.x, tr.y);
+  }
+
+  // Dynamic Track Lifecycle for Live Video / WebRTC / ArrayBuffer Streams
+  if (isLiveStream) {
+    // 1. Prune stale or out-of-bounds tracks
+    for (let i = activeTracks.length - 1; i >= 0; i--) {
+      const tr = activeTracks[i];
+      const oob = tr.x < 1 || tr.x >= arena.w - 1 || tr.y < 1 || tr.y >= arena.h - 1;
+      if ((tr.missedFrames || 0) > 14 || oob) {
+        activeTracks.splice(i, 1);
+        arena.legacyTracks.splice(i, 1);
+      }
+    }
+
+    // 2. Spawn new tracks on high-salience unmatched RoPE2D medoids (up to 12 live tracks)
+    for (let m = 0; m < medoidCount && activeTracks.length < 12; m++) {
+      if (usedMedoids[m]) continue;
+      const med = arena.medoids[m];
+      if (!med.active) continue;
+
+      let tooClose = false;
+      for (let i = 0; i < activeTracks.length; i++) {
+        const d = Math.hypot(med.x - activeTracks[i].x, med.y - activeTracks[i].y);
+        if (d < 8.0) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) continue;
+
+      const seq = (STATE.liveTrackSeq = (STATE.liveTrackSeq || 0) + 1);
+      const id = `TRK-${seq}`;
+      activeTracks.push({
+        id,
+        x: med.x,
+        y: med.y,
+        vx: 0,
+        vy: 0,
+        ax: 0,
+        ay: 0,
+        missedFrames: 0,
+        isAutonomous: undefined,
+        isGenerator: true,
+        eta: 0.65,
+        history: [{ x: med.x, y: med.y }],
+        color: deck.getTrackColor(seq - 1),
+      });
+      arena.legacyTracks.push({
+        id,
+        x: med.x,
+        y: med.y,
+        vx: 0,
+        vy: 0,
+        history: [{ x: med.x, y: med.y }],
+        dropped: false,
+        swapped: false,
+      });
+    }
   }
 
   // Stage 3: Collision Occlusion Tie-Breaking (Theorem 2.2)
@@ -2159,8 +2253,104 @@ function updateTelemetryHUD() {
 
 let animFrameId = null;
 let webRtcStream = null;
+const offscreenVideoCanvas = document.getElementById('offscreen-video-canvas');
+const offscreenVideoCtx = offscreenVideoCanvas.getContext('2d', { willReadFrequently: true });
 
-function setMode(mode) {
+function resetArenaForLiveStream() {
+  arena.tracks = [];
+  arena.legacyTracks = [];
+  arena.currFrame.fill(0);
+  arena.prevFrame.fill(0);
+  arena.curlNorm.fill(0);
+  arena.washoutMask.fill(0);
+  arena.clockMask.fill(0);
+  arena.nopeMask.fill(0);
+  arena.ringBuffer.fill(0);
+  arena.ringHead = 0;
+  for (let i = 0; i < CONFIG.maxMedoids; i++) arena.medoids[i].active = false;
+  STATE.frameIdx = 0;
+  STATE.darkSnailSwaps = 0;
+  STATE.legacySwaps = 0;
+  STATE.liveTrackSeq = 0;
+  STATE.hasVideoFrame = false;
+  STATE.lastVideoTime = -1;
+}
+
+function ingestVideoFrameToArena(video, arena, forceIngest = false) {
+  if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+    return false;
+  }
+  const curTime = video.currentTime || 0;
+  if (!forceIngest && STATE.hasVideoFrame && Math.abs(curTime - STATE.lastVideoTime) < 0.0005 && STATE.mode === 'file') {
+    return false;
+  }
+
+  // Shift currFrame -> prevFrame before sampling new video frame
+  if (STATE.hasVideoFrame) {
+    arena.prevFrame.set(arena.currFrame);
+  }
+
+  offscreenVideoCtx.drawImage(video, 0, 0, arena.w, arena.h);
+  const imgData = offscreenVideoCtx.getImageData(0, 0, arena.w, arena.h);
+  const d = imgData.data;
+  for (let i = 0; i < arena.size; i++) {
+    arena.currFrame[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  }
+
+  // On the very first video frame, seed prevFrame = currFrame so frame 0 does not trigger a screen-wide delta
+  if (!STATE.hasVideoFrame) {
+    arena.prevFrame.set(arena.currFrame);
+    for (let r = 0; r < arena.ringSize; r++) {
+      arena.pushRingFrame(arena.currFrame);
+    }
+  }
+
+  if (CONFIG.patchBlur) {
+    const patch = 8;
+    for (let py = 0; py < arena.h; py += patch) {
+      for (let px = 0; px < arena.w; px += patch) {
+        let sum = 0;
+        for (let dy = 0; dy < patch; dy++) {
+          for (let dx = 0; dx < patch; dx++) {
+            sum += arena.currFrame[(py + dy) * arena.w + (px + dx)];
+          }
+        }
+        const avg = sum / (patch * patch);
+        for (let dy = 0; dy < patch; dy++) {
+          for (let dx = 0; dx < patch; dx++) {
+            arena.currFrame[(py + dy) * arena.w + (px + dx)] = avg;
+          }
+        }
+      }
+    }
+  }
+
+  arena.pushRingFrame(arena.currFrame);
+  STATE.hasVideoFrame = true;
+  STATE.lastVideoTime = curTime;
+  STATE.frameIdx++;
+
+  if (STATE.mode === 'file' && isFinite(video.duration) && video.duration > 0) {
+    const fps = STATE.fileFps || 60;
+    const curFrame = Math.min(Math.round(video.duration * fps), Math.round(curTime * fps));
+    document.getElementById('file-frame-cur').innerText = curFrame;
+    document.getElementById('file-scrubber').value = curFrame;
+  }
+  return true;
+}
+
+function syncPlayButtonsUI() {
+  document.getElementById('play-pause-icon').innerText = STATE.isPlaying ? '⏸' : '▶';
+  document.getElementById('play-pause-text').innerText = STATE.isPlaying ? 'PAUSE' : 'RESUME';
+  document.getElementById('badge-engine-status').innerText = STATE.isPlaying ? '240 Hz ENGINE ACTIVE' : 'ENGINE PAUSED';
+  document.getElementById('badge-engine-status').className = STATE.isPlaying ? 'badge badge-success' : 'badge badge-warning';
+  const filePlayBtn = document.getElementById('file-play-btn');
+  if (filePlayBtn) {
+    filePlayBtn.innerText = STATE.isPlaying ? '⏸ PAUSE' : '▶ PLAY';
+  }
+}
+
+function setMode(mode, skipDropzoneOverlay = false) {
   STATE.mode = mode;
   document.getElementById('btn-mode-deck').classList.toggle('active', mode === 'deck');
   document.getElementById('btn-mode-webrtc').classList.toggle('active', mode === 'webrtc');
@@ -2171,13 +2361,25 @@ function setMode(mode) {
   document.getElementById('webrtc-notice').style.display = 'none';
   document.getElementById('dropzone-notice').style.display = 'none';
 
+  const fileVideo = document.getElementById('file-video');
+  if (mode !== 'file' && fileVideo && !fileVideo.paused) {
+    fileVideo.pause();
+  }
+
   if (mode === 'webrtc') {
+    resetArenaForLiveStream();
     startWebRTC();
   } else if (mode === 'file') {
     stopWebRTC();
-    document.getElementById('dropzone-notice').style.display = 'flex';
+    const hasLoadedFile = (fileVideo && fileVideo.src && fileVideo.readyState >= 1) || STATE.y8Buffer;
+    if (!hasLoadedFile && !skipDropzoneOverlay) {
+      document.getElementById('dropzone-notice').style.display = 'flex';
+    } else if (fileVideo && fileVideo.src && STATE.isPlaying) {
+      fileVideo.play().catch(() => {});
+    }
   } else {
     stopWebRTC();
+    deck.initScenario(STATE.scenario);
   }
 }
 
@@ -2211,80 +2413,198 @@ function retryWebRTC() {
   startWebRTC();
 }
 
-// File Drag & Drop Handlers
+// File Drag & Drop Handlers (Overlay + Global Window Drop Support)
 const dropArea = document.getElementById('dropzone-area');
 ['dragenter', 'dragover'].forEach(name => {
   dropArea.addEventListener(name, (e) => { e.preventDefault(); dropArea.classList.add('dragover'); }, false);
+  window.addEventListener(name, (e) => { e.preventDefault(); }, false);
 });
 ['dragleave', 'drop'].forEach(name => {
   dropArea.addEventListener(name, (e) => { e.preventDefault(); dropArea.classList.remove('dragover'); }, false);
 });
 dropArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   const dt = e.dataTransfer;
-  if (dt.files && dt.files.length > 0) handleFile(dt.files[0]);
+  if (dt && dt.files && dt.files.length > 0) handleFile(dt.files[0]);
+});
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const dt = e.dataTransfer;
+  if (dt && dt.files && dt.files.length > 0) handleFile(dt.files[0]);
 });
 
 function handleFileSelect(e) {
-  if (e.target.files && e.target.files.length > 0) handleFile(e.target.files[0]);
+  if (e.target.files && e.target.files.length > 0) {
+    handleFile(e.target.files[0]);
+    e.target.value = '';
+  }
 }
 
 function handleFile(file) {
+  if (STATE.mode !== 'file') {
+    setMode('file', true);
+  }
   document.getElementById('dropzone-notice').style.display = 'none';
-  document.getElementById('file-format-badge').innerText = file.name.toUpperCase();
+  const badge = document.getElementById('file-format-badge');
+  badge.innerText = file.name.toUpperCase();
 
-  if (file.name.endsWith('.mp4') || file.name.endsWith('.webm')) {
+  resetArenaForLiveStream();
+
+  const lower = file.name.toLowerCase();
+  const isRawY8 = lower.endsWith('.y8') || lower.endsWith('.bin') || lower.endsWith('.raw');
+  const isVideo = !isRawY8 && (
+    (file.type && file.type.startsWith('video/')) ||
+    /\.(mp4|webm|mov|m4v|mkv|avi|ogv|ogg)$/i.test(lower)
+  );
+
+  if (isVideo) {
+    STATE.y8Buffer = null;
+    STATE.fileFps = 60;
     const video = document.getElementById('file-video');
-    video.src = URL.createObjectURL(file);
+    video.pause();
+    if (STATE.fileObjectUrl) {
+      URL.revokeObjectURL(STATE.fileObjectUrl);
+    }
+    STATE.fileObjectUrl = URL.createObjectURL(file);
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.src = STATE.fileObjectUrl;
+
     video.onloadedmetadata = () => {
-      document.getElementById('file-frame-tot').innerText = Math.round(video.duration * 240);
-      document.getElementById('file-scrubber').max = Math.round(video.duration * 240);
+      const dur = isFinite(video.duration) && video.duration > 0 ? video.duration : 1.0;
+      const totFrames = Math.max(1, Math.round(dur * STATE.fileFps));
+      document.getElementById('file-frame-tot').innerText = totFrames;
+      document.getElementById('file-scrubber').max = totFrames;
+      document.getElementById('file-scrubber').value = 0;
+      document.getElementById('file-frame-cur').innerText = 0;
     };
-  } else if (file.name.endsWith('.y8') || file.name.endsWith('.bin')) {
+
+    video.onloadeddata = () => {
+      STATE.isPlaying = true;
+      syncPlayButtonsUI();
+      ingestVideoFrameToArena(video, arena, true);
+      runDarkSnailTrackerStep(arena);
+      renderQuadA(arena);
+      renderQuadB(arena);
+      renderQuadC(arena);
+      renderQuadD(arena);
+      video.play().catch(err => {
+        console.warn('Video autoplay blocked or failed:', err);
+      });
+    };
+
+    video.onerror = () => {
+      badge.innerText = 'UNSUPPORTED CODEC: ' + file.name.toUpperCase();
+    };
+
+    video.load();
+  } else if (isRawY8) {
+    const video = document.getElementById('file-video');
+    video.pause();
+    video.removeAttribute('src');
     const reader = new FileReader();
     reader.onload = (e) => {
       const buffer = e.target.result;
       const u8 = new Uint8Array(buffer);
-      // Process raw Y8 frames
-      console.log('Loaded Y8 ArrayBuffer of size:', u8.byteLength);
+      STATE.y8Buffer = u8;
+      STATE.y8FrameCount = Math.max(1, Math.floor(u8.byteLength / arena.size));
+      STATE.y8FrameIdx = 0;
+      document.getElementById('file-frame-tot').innerText = STATE.y8FrameCount;
+      document.getElementById('file-scrubber').max = Math.max(0, STATE.y8FrameCount - 1);
+      document.getElementById('file-scrubber').value = 0;
+      document.getElementById('file-frame-cur').innerText = 0;
+      STATE.isPlaying = true;
+      syncPlayButtonsUI();
     };
     reader.readAsArrayBuffer(file);
+  } else {
+    badge.innerText = 'UNRECOGNIZED FILE: ' + file.name.toUpperCase();
   }
 }
 
 function scrubFileFrame(val) {
-  document.getElementById('file-frame-cur').innerText = val;
+  const frameNum = parseInt(val, 10) || 0;
+  document.getElementById('file-frame-cur').innerText = frameNum;
+  if (STATE.y8Buffer) {
+    STATE.y8FrameIdx = Math.min(STATE.y8FrameCount - 1, Math.max(0, frameNum));
+    mainLoop(performance.now(), true);
+    return;
+  }
   const video = document.getElementById('file-video');
-  if (video.duration) {
-    video.currentTime = val / 240.0;
+  if (video && isFinite(video.duration) && video.duration > 0) {
+    const fps = STATE.fileFps || 60;
+    video.currentTime = Math.min(video.duration, Math.max(0, frameNum / fps));
+    video.onseeked = () => {
+      ingestVideoFrameToArena(video, arena, true);
+      runDarkSnailTrackerStep(arena);
+      renderQuadA(arena);
+      renderQuadB(arena);
+      renderQuadC(arena);
+      renderQuadD(arena);
+    };
   }
 }
 
 function filePlayToggle() {
-  const video = document.getElementById('file-video');
-  if (video.paused) video.play();
-  else video.pause();
+  togglePlayPause();
 }
 
 // User Controls
 function togglePlayPause() {
   STATE.isPlaying = !STATE.isPlaying;
-  document.getElementById('play-pause-icon').innerText = STATE.isPlaying ? '⏸' : '▶';
-  document.getElementById('play-pause-text').innerText = STATE.isPlaying ? 'PAUSE' : 'RESUME';
-  document.getElementById('badge-engine-status').innerText = STATE.isPlaying ? '240 Hz ENGINE ACTIVE' : 'ENGINE PAUSED';
-  document.getElementById('badge-engine-status').className = STATE.isPlaying ? 'badge badge-success' : 'badge badge-warning';
+  if (STATE.mode === 'file' && !STATE.y8Buffer) {
+    const video = document.getElementById('file-video');
+    if (video && video.src) {
+      if (STATE.isPlaying) video.play().catch(() => {});
+      else video.pause();
+    }
+  }
+  syncPlayButtonsUI();
 }
 
 function stepFrame() {
   STATE.isPlaying = false;
-  document.getElementById('play-pause-icon').innerText = '▶';
-  document.getElementById('play-pause-text').innerText = 'RESUME';
+  if (STATE.mode === 'file' && !STATE.y8Buffer) {
+    const video = document.getElementById('file-video');
+    if (video && video.src) {
+      video.pause();
+      if (isFinite(video.duration) && video.duration > 0) {
+        const fps = STATE.fileFps || 60;
+        video.currentTime = (video.currentTime + 1.0 / fps) % video.duration;
+        video.onseeked = () => {
+          ingestVideoFrameToArena(video, arena, true);
+          runDarkSnailTrackerStep(arena);
+          renderQuadA(arena);
+          renderQuadB(arena);
+          renderQuadC(arena);
+          renderQuadD(arena);
+        };
+        syncPlayButtonsUI();
+        return;
+      }
+    }
+  }
+  syncPlayButtonsUI();
   mainLoop(performance.now(), true);
 }
 
 function resetTracking() {
-  deck.initScenario(STATE.scenario);
-  STATE.darkSnailSwaps = 0;
-  STATE.legacySwaps = 0;
+  if (STATE.mode === 'file' || STATE.mode === 'webrtc') {
+    resetArenaForLiveStream();
+    if (STATE.mode === 'file' && !STATE.y8Buffer) {
+      const video = document.getElementById('file-video');
+      if (video && video.src) {
+        video.currentTime = 0;
+        if (STATE.isPlaying) video.play().catch(() => {});
+      }
+    }
+  } else {
+    deck.initScenario(STATE.scenario);
+    STATE.darkSnailSwaps = 0;
+    STATE.legacySwaps = 0;
+  }
   verifyFormalTheorems();
 }
 
@@ -2320,6 +2640,7 @@ let lastFpsUpdate = performance.now();
 function mainLoop(timestamp, singleStep = false) {
   if (STATE.isPlaying || singleStep) {
     const tStart = performance.now();
+    let frameUpdated = true;
 
     if (STATE.mode === 'deck') {
       // Advance procedural torture deck frame
@@ -2327,25 +2648,42 @@ function mainLoop(timestamp, singleStep = false) {
     } else if (STATE.mode === 'webrtc') {
       // Capture live WebRTC webcam frame
       const video = document.getElementById('webrtc-video');
-      if (video.readyState >= 2) {
-        CTXS.a.drawImage(video, 0, 0, arena.w, arena.h);
-        const imgData = CTXS.a.getImageData(0, 0, arena.w, arena.h);
-        const d = imgData.data;
+      frameUpdated = ingestVideoFrameToArena(video, arena, singleStep);
+    } else if (STATE.mode === 'file') {
+      if (STATE.y8Buffer && STATE.y8FrameCount > 0) {
+        arena.prevFrame.set(arena.currFrame);
+        const offset = (STATE.y8FrameIdx % STATE.y8FrameCount) * arena.size;
         for (let i = 0; i < arena.size; i++) {
-          arena.currFrame[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+          arena.currFrame[i] = STATE.y8Buffer[offset + i] || 0;
+        }
+        if (STATE.y8FrameIdx === 0 && STATE.frameIdx === 0) {
+          arena.prevFrame.set(arena.currFrame);
         }
         arena.pushRingFrame(arena.currFrame);
+        document.getElementById('file-frame-cur').innerText = STATE.y8FrameIdx;
+        document.getElementById('file-scrubber').value = STATE.y8FrameIdx;
+        STATE.y8FrameIdx = (STATE.y8FrameIdx + 1) % STATE.y8FrameCount;
+        STATE.frameIdx++;
+        frameUpdated = true;
+      } else {
+        const video = document.getElementById('file-video');
+        if (video && video.src && video.paused && STATE.isPlaying && !singleStep && video.readyState >= 2) {
+          video.play().catch(() => {});
+        }
+        frameUpdated = ingestVideoFrameToArena(video, arena, singleStep);
       }
     }
 
-    // Run 4-Stage DarkSnail Tracker Step
-    runDarkSnailTrackerStep(arena);
+    if (frameUpdated) {
+      // Run 4-Stage DarkSnail Tracker Step
+      runDarkSnailTrackerStep(arena);
 
-    // Render 4 Tactical Viewports
-    renderQuadA(arena);
-    renderQuadB(arena);
-    renderQuadC(arena);
-    renderQuadD(arena);
+      // Render 4 Tactical Viewports
+      renderQuadA(arena);
+      renderQuadB(arena);
+      renderQuadC(arena);
+      renderQuadD(arena);
+    }
 
     const tEnd = performance.now();
     const latencyUs = (tEnd - tStart) * 1000.0;
@@ -2380,6 +2718,7 @@ if (typeof window !== 'undefined') {
   window.changeScenario = changeScenario;
   window.updateSliders = updateSliders;
   window.togglePatchBlur = togglePatchBlur;
+  window.handleFile = handleFile;
 }
 
 // Kickoff with optional URL query parameters (?scenario=03&warmup=85)
