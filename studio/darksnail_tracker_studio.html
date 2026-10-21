@@ -1088,16 +1088,22 @@ function extractBeltramiSpikesAndWashouts(arena) {
       const gradNormSq = dx * dx + dy * dy;
       const peakLap = Math.max(0.0, 4.0 * val - (curr[idx + 1] + curr[idx - 1] + curr[idx + w] + curr[idx - w]));
       const nopeWeight = arena.clockMask[idx] ? 0.0 : 1.0;
-      const motionBoost = (STATE.mode !== 'deck') ? Math.abs(dt) * 0.85 : 0.0;
-      const salience = nopeWeight * (
-        Math.sqrt(gradNormSq) * 0.45 +
-        peakLap * 0.45 +
-        Math.max(0.0, val - 38.0) * 0.35 +
-        motionBoost
-      );
+      let salience;
+      if (STATE.mode === 'deck') {
+        salience = nopeWeight * (
+          Math.sqrt(gradNormSq) * 0.45 +
+          peakLap * 0.45 +
+          Math.max(0.0, val - 38.0) * 0.35
+        );
+      } else {
+        // In live camera / video streams, reject DC wall brightness and couple exterior-curl with H_nope motion
+        const baseCurl = Math.sqrt(gradNormSq) * 0.55 + peakLap * 0.65;
+        const motionGain = arena.nopeMask[idx] ? (1.35 + Math.min(2.2, Math.abs(dt) * 0.08)) : 0.30;
+        salience = nopeWeight * baseCurl * motionGain;
+      }
 
       curl[idx] = salience;
-      if (salience > 18.0) {
+      if (salience > (STATE.mode === 'deck' ? 18.0 : 26.0)) {
         spikeCount++;
       }
     }
@@ -1264,13 +1270,33 @@ function splitTemporalContinuity(arena) {
   const prev = arena.prevFrame;
   const clockMask = arena.clockMask;
   const nopeMask = arena.nopeMask;
+  const diffMask = arena.diffMask;
 
   let clockCount = 0;
   let nopeCount = 0;
   let cycleCount = 0;
 
-  // Retrieve frame from 4 steps ago for cycle detection
+  // Retrieve frames from 2 and 4 steps ago for cycle detection
+  const frameBack2 = arena.getRingFrame(2);
   const frameBack4 = arena.getRingFrame(4);
+  const isLiveStream = STATE.mode !== 'deck';
+
+  // O(1) 256-sample strided MAD floor on |curr - prev| to reject CMOS sensor noise in live streams
+  let liveDtCutoff = 11.0;
+  if (isLiveStream) {
+    const dtSamples = new Float32Array(256);
+    for (let s = 0; s < 256; s++) {
+      const k = (s * 64) % arena.size;
+      dtSamples[s] = Math.abs(curr[k] - prev[k]);
+    }
+    dtSamples.sort();
+    const dtMed = 0.5 * (dtSamples[127] + dtSamples[128]);
+    const dtDevs = new Float32Array(256);
+    for (let s = 0; s < 256; s++) dtDevs[s] = Math.abs(dtSamples[s] - dtMed);
+    dtDevs.sort();
+    const dtMad = 0.5 * (dtDevs[127] + dtDevs[128]);
+    liveDtCutoff = Math.max(10.5, dtMed + 4.8 * 1.4826 * dtMad);
+  }
 
   for (let y = 1; y < h - 1; y++) {
     const row = y * w;
@@ -1279,6 +1305,7 @@ function splitTemporalContinuity(arena) {
       const c = curr[idx];
       const p = prev[idx];
       const dtRho = c - p;
+      const absDt = Math.abs(dtRho);
 
       // Approximate flux divergence
       const divJ = ((curr[idx + 1] - curr[idx - 1]) - (prev[idx + 1] - prev[idx - 1])) * 0.25 +
@@ -1286,41 +1313,54 @@ function splitTemporalContinuity(arena) {
 
       const sigma = Math.abs(dtRho + divJ);
 
-      // Thermodynamic Irreversibility Guard:
-      // If pixel reverses state to frame t-4 within tolerance (cyclical swaying or 120Hz PWM flicker)
-      const isReversible = Math.abs(c - frameBack4[idx]) < 5.0 && Math.abs(dtRho) > 4.0;
-      const isLiveStream = STATE.mode !== 'deck';
-
       if (isLiveStream) {
-        // In live video / WebRTC streams, quarantine reversible cycles or uniform flicker without spatial divergence
-        const isUniformStrobe = Math.abs(dtRho) > 45.0 && Math.abs(divJ) < 3.5;
-        if (isReversible || isUniformStrobe) {
+        if (absDt < liveDtCutoff) {
+          clockMask[idx] = 0;
+          nopeMask[idx] = 0;
+          diffMask[idx] = 0.0;
+          continue;
+        }
+        const gradMag = Math.hypot(curr[idx + 1] - curr[idx - 1], curr[idx + w] - curr[idx - w]) * 0.5;
+        const rev4 = Math.abs(c - frameBack4[idx]) < 0.32 * absDt;
+        const rev2 = Math.abs(c - frameBack2[idx]) < 0.32 * absDt;
+        const isCycle = (rev4 || rev2) && absDt > Math.max(15.0, liveDtCutoff * 1.3);
+        const isFlatFlash = gradMag < 6.0 && absDt > liveDtCutoff * 1.35;
+
+        if (isCycle || isFlatFlash) {
           clockMask[idx] = 1;
           nopeMask[idx] = 0;
+          diffMask[idx] = Math.min(1.0, (absDt - liveDtCutoff * 0.5) / 36.0);
           clockCount++;
-          if (isReversible) cycleCount++;
-        } else if (c > 16.0 && (Math.abs(dtRho) > 2.0 || Math.abs(divJ) > 1.5)) {
+          if (isCycle) cycleCount++;
+        } else if (gradMag >= 5.5) {
           clockMask[idx] = 0;
           nopeMask[idx] = 1;
+          diffMask[idx] = Math.min(1.0, (absDt + gradMag * 0.25 - liveDtCutoff * 0.5) / 34.0);
           nopeCount++;
         } else {
           clockMask[idx] = 0;
           nopeMask[idx] = 0;
+          diffMask[idx] = 0.0;
         }
-      } else if (isReversible || sigma > 14.0) {
-        // Quarantined into M_clock (PWM strobe, scrolling HUD, foliage cycle)
-        clockMask[idx] = 1;
-        nopeMask[idx] = 0;
-        clockCount++;
-        if (isReversible) cycleCount++;
-      } else if (c > 20.0 && Math.abs(dtRho) > 2.0 && sigma <= 14.0) {
-        // Isolated mass-conservative target: sigma == 0 -> H_nope
-        clockMask[idx] = 0;
-        nopeMask[idx] = 1;
-        nopeCount++;
       } else {
-        clockMask[idx] = 0;
-        nopeMask[idx] = 0;
+        // Thermodynamic Irreversibility Guard on synthetic Torture Deck:
+        const isReversible = Math.abs(c - frameBack4[idx]) < 5.0 && absDt > 4.0;
+        if (isReversible || sigma > 14.0) {
+          clockMask[idx] = 1;
+          nopeMask[idx] = 0;
+          diffMask[idx] = 1.0;
+          clockCount++;
+          if (isReversible) cycleCount++;
+        } else if (c > 20.0 && absDt > 2.0 && sigma <= 14.0) {
+          clockMask[idx] = 0;
+          nopeMask[idx] = 1;
+          diffMask[idx] = 1.0;
+          nopeCount++;
+        } else {
+          clockMask[idx] = 0;
+          nopeMask[idx] = 0;
+          diffMask[idx] = 0.0;
+        }
       }
     }
   }
@@ -2017,29 +2057,34 @@ function renderQuadB(arena) {
   const h = arena.h;
   const clock = arena.clockMask;
   const nope = arena.nopeMask;
+  const diff = arena.diffMask;
+  const curr = arena.currFrame;
+  const isLive = STATE.mode !== 'deck';
 
   const imgData = ctx.createImageData(w, h);
   const data = imgData.data;
 
   for (let i = 0; i < arena.size; i++) {
     const p = i * 4;
+    const mag = isLive ? Math.max(0.32, Math.min(1.0, diff[i] || 0.6)) : 1.0;
     if (clock[i]) {
       // Amber glow for M_clock (strobe, HUD, foliage cycle)
-      data[p] = 255;     // R
-      data[p + 1] = 184; // G
-      data[p + 2] = 0;   // B
-      data[p + 3] = 220;
+      data[p] = Math.round(255 * mag);
+      data[p + 1] = Math.round(184 * mag);
+      data[p + 2] = 0;
+      data[p + 3] = 235;
     } else if (nope[i]) {
       // Emerald glow for H_nope (mass-conservative targets)
-      data[p] = 0;       // R
-      data[p + 1] = 255; // G
-      data[p + 2] = 157; // B
+      data[p] = 0;
+      data[p + 1] = Math.round(255 * mag);
+      data[p + 2] = Math.round(157 * mag);
       data[p + 3] = 255;
     } else {
-      // Void
-      data[p] = 8;
-      data[p + 1] = 12;
-      data[p + 2] = 18;
+      // Subtle structural silhouette in live mode, dark void in deck mode
+      const base = isLive ? curr[i] * 0.08 : 0;
+      data[p] = Math.min(255, Math.round(8 + base * 0.4));
+      data[p + 1] = Math.min(255, Math.round(12 + base * 0.9));
+      data[p + 2] = Math.min(255, Math.round(18 + base * 0.8));
       data[p + 3] = 255;
     }
   }
@@ -2281,21 +2326,33 @@ function ingestVideoFrameToArena(video, arena, forceIngest = false) {
     return false;
   }
   const curTime = video.currentTime || 0;
-  if (!forceIngest && STATE.hasVideoFrame && Math.abs(curTime - STATE.lastVideoTime) < 0.0005 && STATE.mode === 'file') {
-    return false;
-  }
-
-  // Shift currFrame -> prevFrame before sampling new video frame
-  if (STATE.hasVideoFrame) {
-    arena.prevFrame.set(arena.currFrame);
-  }
 
   offscreenVideoCtx.drawImage(video, 0, 0, arena.w, arena.h);
   const imgData = offscreenVideoCtx.getImageData(0, 0, arena.w, arena.h);
   const d = imgData.data;
+  const scratch = arena.patchBlurBuffer;
   for (let i = 0; i < arena.size; i++) {
-    arena.currFrame[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    scratch[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
   }
+
+  // Deduplicate identical decoded frames when requestAnimationFrame ticks faster than the camera/video FPS
+  if (STATE.hasVideoFrame && !forceIngest) {
+    let maxFrameDiff = 0.0;
+    for (let s = 0; s < 256; s++) {
+      const k = (s * 64) % arena.size;
+      const diff = Math.abs(scratch[k] - arena.currFrame[k]);
+      if (diff > maxFrameDiff) maxFrameDiff = diff;
+    }
+    if (maxFrameDiff < 0.05) {
+      return false;
+    }
+  }
+
+  // Shift currFrame -> prevFrame before committing new video frame
+  if (STATE.hasVideoFrame) {
+    arena.prevFrame.set(arena.currFrame);
+  }
+  arena.currFrame.set(scratch);
 
   // On the very first video frame, seed prevFrame = currFrame so frame 0 does not trigger a screen-wide delta
   if (!STATE.hasVideoFrame) {
