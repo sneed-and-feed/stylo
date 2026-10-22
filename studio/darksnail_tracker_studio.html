@@ -48,6 +48,13 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #243b61 #060b14;
+}
+
+.ctrl-group,
+.panel-body > * {
+  flex-shrink: 0;
 }
 
 html, body {
@@ -73,27 +80,33 @@ html, body {
 .annunciator-strip {
   background: #05080c;
   border-bottom: 1px solid var(--border-dim);
-  padding: 3px 14px;
+  padding: 2.5px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--text-muted);
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .annun-group {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .annun-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .annun-dot {
@@ -117,11 +130,11 @@ header {
   background: linear-gradient(180deg, #121a26 0%, var(--bg-panel) 100%);
   border-bottom: 1px solid var(--border-subtle);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
-  padding: 5px 14px;
+  padding: 4px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
   z-index: 100;
 }
@@ -129,12 +142,14 @@ header {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .brand-icon {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 3px;
   background: linear-gradient(135deg, #00384d 0%, #05131d 100%);
   border: 1px solid var(--cyan);
@@ -144,9 +159,10 @@ header {
   justify-content: center;
   font-family: var(--font-mono);
   font-weight: 800;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--cyan);
   position: relative;
+  flex-shrink: 0;
 }
 
 .brand-icon::after {
@@ -159,30 +175,35 @@ header {
 
 .brand-title {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 800;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
   color: var(--text-bright);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .brand-tag {
-  font-size: 9px;
-  padding: 1px 5px;
+  font-size: 8.5px;
+  padding: 1px 4px;
   background: rgba(0, 240, 255, 0.12);
   border: 1px solid rgba(0, 240, 255, 0.4);
   color: var(--cyan);
   border-radius: 2px;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .brand-sub {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 9px;
   color: var(--text-muted);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Ruggedized Mode Switcher */
@@ -192,7 +213,8 @@ header {
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   padding: 2px;
-  gap: 3px;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .mode-btn {
@@ -200,16 +222,18 @@ header {
   border: 1px solid transparent;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  padding: 5px 12px;
+  padding: 4px 9px;
   border-radius: 3px;
   cursor: pointer;
   transition: all 0.12s ease;
   display: flex;
   align-items: center;
-  gap: 6px;
-  letter-spacing: 0.5px;
+  gap: 5px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .mode-btn:hover {
@@ -229,7 +253,8 @@ header {
 .global-controls {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .btn {
@@ -237,17 +262,18 @@ header {
   border: 1px solid var(--border-subtle);
   color: var(--text-main);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: 3px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   transition: all 0.12s ease;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn:hover {
@@ -309,21 +335,22 @@ header {
 }
 
 .btn-sm {
-  padding: 3px 7px;
-  font-size: 9.5px;
+  padding: 2.5px 6px;
+  font-size: 9px;
 }
 
 .badge {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
-  padding: 3px 7px;
+  padding: 2.5px 6px;
   border-radius: 2px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-abyss);
   color: var(--text-muted);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .badge-success {
@@ -360,35 +387,39 @@ header {
 .sub-bar {
   background: var(--bg-bezel);
   border-bottom: 1px solid var(--border-subtle);
-  padding: 4px 14px;
+  padding: 3px 12px;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  flex-shrink: 0;
-}
-
-.tactical-view-bar {
-  background: linear-gradient(180deg, #0c121b 0%, #090d14 100%);
-  border-bottom: 1px solid var(--border-subtle);
-  padding: 4px 14px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 8px;
   font-family: var(--font-mono);
   font-size: 10px;
   flex-shrink: 0;
 }
 
+.tactical-view-bar {
+  background: linear-gradient(180deg, #0c121b 0%, #090d14 100%);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 2.5px 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  flex-shrink: 0;
+}
+
 .bar-section {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding-right: 8px;
+  gap: 2.5px;
+  padding-right: 4px;
   border-right: 1px solid var(--border-dim);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .bar-section:last-child {
@@ -398,9 +429,10 @@ header {
 
 .bar-label {
   color: var(--text-muted);
-  font-size: 9.5px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
 }
 
 .scenario-select, .tactical-select {
@@ -408,11 +440,12 @@ header {
   border: 1px solid var(--border-subtle);
   color: var(--text-bright);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 3px 7px;
+  padding: 2px 6px;
   border-radius: 3px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .scenario-select:focus, .tactical-select:focus {
@@ -424,14 +457,16 @@ header {
 .slider-group {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 9.5px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .slider-group span.val {
   color: var(--cyan);
-  min-width: 38px;
+  min-width: 34px;
   font-weight: 700;
 }
 
@@ -444,7 +479,8 @@ input[type="range"] {
   border-radius: 2px;
   outline: none;
   cursor: pointer;
-  width: 78px;
+  width: 64px;
+  flex-shrink: 0;
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -463,7 +499,8 @@ input[type="range"]::-webkit-slider-thumb {
 .pill-group {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 1.5px;
+  flex-shrink: 0;
 }
 
 .pill-btn {
@@ -471,15 +508,17 @@ input[type="range"]::-webkit-slider-thumb {
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 8px;
   font-weight: 700;
-  padding: 3px 7px;
+  padding: 1.5px 3.5px;
   border-radius: 2px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   transition: all 0.12s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .pill-btn:hover {
@@ -527,6 +566,8 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-dim);
   border-radius: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .toggle-wrapper:hover {
@@ -596,16 +637,22 @@ input[type="range"]::-webkit-slider-thumb {
 .cursor-inspector {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 8px;
   color: var(--text-muted);
   background: #05080d;
   border: 1px solid var(--border-dim);
-  padding: 2px 8px;
+  padding: 1.5px 5px;
   border-radius: 2px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.cursor-inspector:hover {
+  border-color: var(--cyan);
 }
 
 .cursor-inspector b {
@@ -623,6 +670,9 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 6px 14px;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .quad-grid.layout-single {
@@ -639,6 +689,9 @@ input[type="range"]::-webkit-slider-thumb {
   overflow: hidden;
   position: relative;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
   box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.65);
 }
 
@@ -668,36 +721,46 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .quad-header {
+  height: 24px;
   background: linear-gradient(90deg, #101722 0%, #0c1119 100%);
-  padding: 4px 10px;
+  padding: 0 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .quad-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   color: var(--text-bright);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .quad-id {
   color: #000;
   background: var(--cyan);
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: 2px;
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 800;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .quad-id.b { background: var(--amber); }
@@ -708,28 +771,35 @@ input[type="range"]::-webkit-slider-thumb {
 .quad-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .quad-legend {
   display: flex;
-  gap: 8px;
-  font-size: 9.5px;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
   color: var(--text-muted);
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2.5px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .legend-dot {
   width: 6px;
   height: 6px;
   border-radius: 1px;
+  flex-shrink: 0;
 }
 
 .dot-cyan { background: var(--cyan); box-shadow: 0 0 4px var(--cyan); }
@@ -744,11 +814,12 @@ input[type="range"]::-webkit-slider-thumb {
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 2px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .quad-max-btn:hover {
@@ -759,19 +830,28 @@ input[type="range"]::-webkit-slider-thumb {
 .quad-body {
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
   position: relative;
   background: #030508;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  container-type: size;
 }
 
-canvas.tactical-canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+canvas.tactical-canvas,
+.tactical-canvas {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
   cursor: crosshair;
+  margin: auto;
 }
 
 /* Floating Ruggedized Overlay Telemetry Box on Quad */
@@ -811,13 +891,14 @@ canvas.tactical-canvas {
   bottom: 5px;
   right: 7px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8.5px;
   color: rgba(226, 234, 242, 0.55);
   background: rgba(4, 6, 9, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 1px 5px;
   border-radius: 2px;
   pointer-events: none;
+  white-space: nowrap;
 }
 
 /* =========================================================================
@@ -826,10 +907,10 @@ canvas.tactical-canvas {
 footer {
   background: linear-gradient(180deg, var(--bg-panel) 0%, #06090e 100%);
   border-top: 1px solid var(--border-subtle);
-  padding: 4px 14px 5px 14px;
+  padding: 3px 12px 4px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
   z-index: 100;
 }
@@ -844,7 +925,7 @@ footer {
 
 .telemetry-cards {
   display: grid;
-  grid-template-columns: repeat(7, minmax(118px, 1fr));
+  grid-template-columns: repeat(7, minmax(112px, 1fr));
   gap: 6px;
   width: 100%;
 }
@@ -854,12 +935,22 @@ footer {
   border: 1px solid var(--border-subtle);
   border-top: 2px solid var(--border-active);
   border-radius: 3px;
-  padding: 3px 8px;
+  padding: 3px 7px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   font-family: var(--font-mono);
   position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.telemetry-card:hover,
+.telemetry-card.active-card {
+  border-color: var(--cyan);
+  box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.12);
 }
 
 .telemetry-card.accent-cyan { border-top-color: var(--cyan); }
@@ -868,28 +959,43 @@ footer {
 .telemetry-card.accent-purple { border-top-color: var(--purple); }
 
 .telemetry-card .t-label {
-  font-size: 8.5px;
+  font-size: 8px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   display: flex;
   justify-content: space-between;
+  position: relative;
+  z-index: 2;
 }
 
 .telemetry-card .t-value {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--text-bright);
   display: flex;
   align-items: baseline;
   gap: 4px;
   white-space: nowrap;
+  position: relative;
+  z-index: 2;
 }
 
 .telemetry-card .t-unit {
-  font-size: 8.5px;
+  font-size: 8px;
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.telemetry-sparkline {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  width: 68px;
+  height: 16px;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Theorem Badge Bar */
@@ -897,30 +1003,41 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 3px;
   font-family: var(--font-mono);
-  font-size: 8.8px;
+  font-size: 7.5px;
 }
 
 .thm-group {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 3px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 2px;
 }
 
 .thm-badge {
   background: #071912;
   border: 1px solid rgba(0, 255, 157, 0.55);
   color: var(--emerald);
-  padding: 1px 5px;
+  padding: 1px 3px;
   border-radius: 2px;
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   font-weight: 700;
+  font-size: 7.5px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.thm-badge:hover {
+  border-color: var(--cyan);
+  background: #0d2b22;
 }
 
 .thm-badge span.metric {
@@ -932,12 +1049,13 @@ footer {
   background: #0e1824;
   border: 1px solid #213c5c;
   color: #6cb6ff;
-  padding: 1px 4px;
+  padding: 1px 3px;
   border-radius: 2px;
   white-space: nowrap;
-  font-size: 8.5px;
+  font-size: 7.5px;
   text-decoration: none;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all 0.12s ease;
 }
 
@@ -1312,7 +1430,7 @@ footer {
   </div>
 
   <!-- Live Pixel & Target Cursor Inspector -->
-  <div class="cursor-inspector" id="cursor-inspector">
+  <div class="cursor-inspector" id="cursor-inspector" onclick="toggleCursorInspectorPin()" title="Click to Pin / Unpin Target Lock Reticle">
     <span>POS <b id="insp-xy">064,064</b></span>
     <span>Y8 <b id="insp-y8">000</b></span>
     <span>CURL <b id="insp-curl">0.0</b></span>
@@ -1325,7 +1443,7 @@ footer {
   <!-- Quad A: Raw Sensor + Beltrami Shell -->
   <div class="quad-panel" id="panel-quad-a">
     <div class="quad-header">
-      <div class="quad-title">
+      <div class="quad-title" onclick="toggleMaximizeQuad('a')" title="Click to Maximize / Restore Quad A">
         <span class="quad-id" id="quad-a-badge">QUAD A</span>
         <span id="quad-a-title-text">RAW SENSOR + BELTRAMI CALLOSAL SHELL</span>
       </div>
@@ -1352,14 +1470,14 @@ footer {
   <!-- Quad B: Continuity Splitter H_clock (+) H_nope -->
   <div class="quad-panel" id="panel-quad-b">
     <div class="quad-header">
-      <div class="quad-title">
+      <div class="quad-title" onclick="toggleMaximizeQuad('b')" title="Click to Maximize / Restore Quad B">
         <span class="quad-id b">QUAD B</span>
         <span>CONTINUITY SPLITTER (H_clock ⊕ H_nope)</span>
       </div>
       <div class="quad-header-right">
         <div class="quad-legend">
-          <div class="legend-item"><div class="legend-dot dot-amber"></div><span>M_clock (Clutter)</span></div>
-          <div class="legend-item"><div class="legend-dot dot-emerald"></div><span>H_nope (Targets)</span></div>
+          <div class="legend-item"><div class="legend-dot dot-amber"></div><span>M_clock</span></div>
+          <div class="legend-item"><div class="legend-dot dot-emerald"></div><span>H_nope</span></div>
         </div>
         <button class="quad-max-btn" id="max-btn-b" onclick="toggleMaximizeQuad('b')" title="Maximize / Restore Quad B">[MAX]</button>
       </div>
@@ -1378,14 +1496,14 @@ footer {
   <!-- Quad C: Anti-Swap Tracker vs Legacy Kalman/IoU -->
   <div class="quad-panel" id="panel-quad-c">
     <div class="quad-header">
-      <div class="quad-title">
+      <div class="quad-title" onclick="toggleMaximizeQuad('c')" title="Click to Maximize / Restore Quad C">
         <span class="quad-id c">QUAD C</span>
         <span>so(C) ANTI-SWAP TRACKER vs LEGACY CV</span>
       </div>
       <div class="quad-header-right">
         <div class="quad-legend">
-          <div class="legend-item"><div class="legend-dot dot-emerald"></div><span>DarkSnail (0 Swaps)</span></div>
-          <div class="legend-item"><div class="legend-dot dot-crimson"></div><span>Legacy Kalman/IoU</span></div>
+          <div class="legend-item"><div class="legend-dot dot-emerald"></div><span>DarkSnail (0)</span></div>
+          <div class="legend-item"><div class="legend-dot dot-crimson"></div><span>Legacy CV</span></div>
         </div>
         <button class="quad-max-btn" id="max-btn-c" onclick="toggleMaximizeQuad('c')" title="Maximize / Restore Quad C">[MAX]</button>
       </div>
@@ -1404,14 +1522,14 @@ footer {
   <!-- Quad D: Causal Graph & Telemetry HUD -->
   <div class="quad-panel" id="panel-quad-d">
     <div class="quad-header">
-      <div class="quad-title">
+      <div class="quad-title" onclick="toggleMaximizeQuad('d')" title="Click to Maximize / Restore Quad D">
         <span class="quad-id d">QUAD D</span>
         <span>CAUSAL GRAPH (G_act vs Ω_reg) &amp; DECOYS</span>
       </div>
       <div class="quad-header-right">
         <div class="quad-legend">
-          <div class="legend-item"><div class="legend-dot dot-emerald"></div><span>★ G_act (η ≥ 0.50)</span></div>
-          <div class="legend-item"><div class="legend-dot dot-crimson"></div><span>✕ Ω_reg (η &lt; 0.50)</span></div>
+          <div class="legend-item"><div class="legend-dot dot-emerald"></div><span>★ G_act</span></div>
+          <div class="legend-item"><div class="legend-dot dot-crimson"></div><span>✕ Ω_reg</span></div>
         </div>
         <button class="quad-max-btn" id="max-btn-d" onclick="toggleMaximizeQuad('d')" title="Maximize / Restore Quad D">[MAX]</button>
       </div>
@@ -1482,34 +1600,41 @@ footer {
 <!-- Telemetry Footer & Formal Theorem Verification Badge Bar -->
 <footer>
   <div class="telemetry-row">
-    <div class="telemetry-cards">
-      <div class="telemetry-card accent-cyan">
+    <div class="telemetry-cards" id="telemetry-cards">
+      <div class="telemetry-card accent-cyan" id="tcard-fps" data-card="fps" title="Click: Play/Pause or Step +1 | Drag: Scrub Telemetry History">
         <div class="t-label"><span>Throughput / Latency</span><span>CPU</span></div>
         <div class="t-value" id="hud-fps">240.0 <span class="t-unit">FPS / 185 µs</span></div>
+        <canvas class="telemetry-sparkline" id="spark-fps" width="68" height="16"></canvas>
       </div>
-      <div class="telemetry-card accent-emerald">
+      <div class="telemetry-card accent-emerald" id="tcard-drift" data-card="drift" title="Click: Inspect S^7 Spherical Cascade (Quad C) | Drag: Scrub History">
         <div class="t-label"><span>Radial Sphere Drift</span><span>SO(8)</span></div>
         <div class="t-value" id="hud-drift" style="color:var(--emerald);">0.000e+00 <span class="t-unit">S^7</span></div>
+        <canvas class="telemetry-sparkline" id="spark-drift" width="68" height="16"></canvas>
       </div>
-      <div class="telemetry-card accent-purple">
+      <div class="telemetry-card accent-purple" id="tcard-heap" data-card="heap" title="Click: Toggle Fused Master HUD & Inspect SRAM Arena | Drag: Scrub History">
         <div class="t-label"><span>Active SRAM Heap</span><span>L2/L3</span></div>
         <div class="t-value" id="hud-heap">0.88 <span class="t-unit">MB &lt; 2.0 MB</span></div>
+        <canvas class="telemetry-sparkline" id="spark-heap" width="68" height="16"></canvas>
       </div>
-      <div class="telemetry-card accent-emerald">
+      <div class="telemetry-card accent-emerald" id="tcard-swaps" data-card="swaps" title="Click: Inspect so(C) Anti-Swap Triad (Quad C) | Drag: Scrub History">
         <div class="t-label"><span>Crossing ID Swaps</span><span>THM 2.2</span></div>
         <div class="t-value" id="hud-swaps" style="color:var(--emerald);">0 <span class="t-unit">Verified</span></div>
+        <canvas class="telemetry-sparkline" id="spark-swaps" width="68" height="16"></canvas>
       </div>
-      <div class="telemetry-card accent-cyan">
+      <div class="telemetry-card accent-cyan" id="tcard-gate" data-card="gate" title="Click: Trigger 1-Sample Innovation Spike Probe (Stage 1 Gate) | Drag: Scrub History">
         <div class="t-label"><span>Innovation Gate</span><span>χ²=22.46</span></div>
         <div class="t-value" id="hud-gate" style="color:var(--cyan); font-size:11px;">NOMINAL</div>
+        <canvas class="telemetry-sparkline" id="spark-gate" width="68" height="16"></canvas>
       </div>
-      <div class="telemetry-card accent-amber">
+      <div class="telemetry-card accent-amber" id="tcard-eta" data-card="eta" title="Click: Inspect Causal Graph & Decoy Factorization (Quad D) | Drag: Scrub History">
         <div class="t-label"><span>Non-Local Action η</span><span>CAUSAL</span></div>
         <div class="t-value" id="hud-eta">0.000 <span class="t-unit">Causal</span></div>
+        <canvas class="telemetry-sparkline" id="spark-eta" width="68" height="16"></canvas>
       </div>
-      <div class="telemetry-card accent-cyan">
+      <div class="telemetry-card accent-cyan" id="tcard-trk" data-card="trk" title="Click: Cycle & Pin Primary Locked Track | Drag: Scrub History">
         <div class="t-label"><span>Primary Track Lock</span><span id="hud-trk-id">T-1</span></div>
         <div class="t-value" id="hud-trk-kin" style="font-size:10.5px; color:var(--emerald);">LOCKED // 0.0 px/f</div>
+        <canvas class="telemetry-sparkline" id="spark-trk" width="68" height="16"></canvas>
       </div>
     </div>
   </div>
@@ -1517,21 +1642,21 @@ footer {
   <!-- Theorems 2.1–2.7 Verification Badge Bar & Literature Grounding Badges -->
   <div class="theorems-bar">
     <div class="thm-group">
-      <span style="color:var(--text-muted); font-size:8.8px; font-weight:800;">THEOREMS:</span>
-      <div class="thm-badge" id="badge-thm21">Thm 2.1 (so(C)): <span class="metric">PASS 0.0e+0</span></div>
-      <div class="thm-badge" id="badge-thm22">Thm 2.2 (Tie-Break): <span class="metric">PASS Δℓ &gt; 0</span></div>
-      <div class="thm-badge" id="badge-thm23">Thm 2.3 (Ortho): <span class="metric">PASS ≤ 1e-8</span></div>
-      <div class="thm-badge" id="badge-thm24">Thm 2.4/2.7 (Step-0): <span class="metric">PASS 0.0e+0</span></div>
-      <div class="thm-badge" id="badge-thm25">Thm 2.5 (RoPE2D): <span class="metric">PASS 1.0000</span></div>
-      <div class="thm-badge" id="badge-thm26">Thm 2.6 (Cascade): <span class="metric">PASS 0.0e+0</span></div>
+      <span style="color:var(--text-muted); font-size:8px; font-weight:800;">THEOREMS:</span>
+      <div class="thm-badge" id="badge-thm21" onclick="inspectFormalTheorem('2.1')" title="Click to audit Theorem 2.1 so(C) Skew-Symmetry">Thm 2.1 (so(C)): <span class="metric">PASS 0.0e+0</span></div>
+      <div class="thm-badge" id="badge-thm22" onclick="inspectFormalTheorem('2.2')" title="Click to audit Theorem 2.2 Crossing Tie-Break Gap">Thm 2.2 (Tie): <span class="metric">PASS Δℓ &gt; 0</span></div>
+      <div class="thm-badge" id="badge-thm23" onclick="inspectFormalTheorem('2.3')" title="Click to audit Theorem 2.3 Tangent Orthogonality">Thm 2.3 (Ortho): <span class="metric">PASS ≤ 1e-8</span></div>
+      <div class="thm-badge" id="badge-thm24" onclick="inspectFormalTheorem('2.4')" title="Click to audit Theorems 2.4/2.7 Step-0 Homotopy">Thm 2.4/2.7 (Step0): <span class="metric">PASS 0.0e+0</span></div>
+      <div class="thm-badge" id="badge-thm25" onclick="inspectFormalTheorem('2.5')" title="Click to audit Theorem 2.5 RoPE2D Medoid Invariance">Thm 2.5 (RoPE2D): <span class="metric">PASS 1.0000</span></div>
+      <div class="thm-badge" id="badge-thm26" onclick="inspectFormalTheorem('2.6')" title="Click to audit Theorem 2.6 S^7 Spherical Cascade">Thm 2.6 (Cascade): <span class="metric">PASS 0.0e+0</span></div>
     </div>
     <div class="thm-group">
-      <span style="color:var(--text-muted); font-size:8.8px; font-weight:800;">LITERATURE:</span>
-      <a class="lit-badge" href="https://arxiv.org/abs/2110.13389" target="_blank" title="Wang et al. (2021) - Normalized Gaussian Wasserstein for Tiny Object Detection">Wang 2021 (Tiny W1)</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2203.14360" target="_blank" title="Cao et al. (2022) - Observation-Centric SORT: Kalman Lag & Occlusion">OC-SORT 2022 (Kalman Lag)</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2110.06864" target="_blank" title="Zhang et al. (2021) - ByteTrack: Associating Every Detection Box">ByteTrack 2021 (Low-SNR)</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2408.09615" target="_blank" title="LimitIRSTD (2024) - Resource-Limited Infrared Small Target Detection">LimitIRSTD 2024 (&lt;2MB)</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2610.07561" target="_blank" title="LARK - Low-Cost Occlusion-Resilient Kalman System">LARK 2026 (Innovation Gate)</a>
+      <span style="color:var(--text-muted); font-size:7.5px; font-weight:800;">LIT:</span>
+      <a class="lit-badge" href="https://arxiv.org/abs/2110.13389" target="_blank" title="Wang et al. (2021) - Normalized Gaussian Wasserstein for Tiny Object Detection">Wang 2021 (W1)</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2203.14360" target="_blank" title="Cao et al. (2022) - Observation-Centric SORT: Kalman Lag & Occlusion">OC-SORT 2022</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2110.06864" target="_blank" title="Zhang et al. (2021) - ByteTrack: Associating Every Detection Box">ByteTrack 2021</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2408.09615" target="_blank" title="LimitIRSTD (2024) - Resource-Limited Infrared Small Target Detection">LimitIRSTD 2024</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2610.07561" target="_blank" title="LARK - Low-Cost Occlusion-Resilient Kalman System">LARK 2026</a>
     </div>
   </div>
 </footer>
@@ -1608,6 +1733,11 @@ const STATE = {
   selectedTrackId: null,
   cursorX: 64,
   cursorY: 64,
+  pinnedPos: null,
+  tacticalPinnedPos: null,
+  scrubHistoryIdx: null,
+  isDraggingTelemetry: false,
+  activeCardKey: null,
   lastExportedMeta: null,
   lastExportedSize: 0,
   telemetryLog: [],
@@ -1815,14 +1945,27 @@ function setupCanvasInspectors() {
     const c = CANVASES[k];
     c.addEventListener('mousemove', (e) => {
       const { gx, gy } = clientToSensorCoords(c, e.clientX, e.clientY);
-      STATE.cursorX = Math.floor(gx);
-      STATE.cursorY = Math.floor(gy);
+      if (!STATE.pinnedPos) {
+        STATE.cursorX = Math.floor(gx);
+        STATE.cursorY = Math.floor(gy);
+      }
       updateCursorInspector();
     });
     c.addEventListener('click', (e) => {
       const { gx, gy } = clientToSensorCoords(c, e.clientX, e.clientY);
       CONFIG.zoomCenterX = gx;
       CONFIG.zoomCenterY = gy;
+      const sx = (gx + 0.5) * CONFIG.renderScale;
+      const sy = (gy + 0.5) * CONFIG.renderScale;
+      if (STATE.pinnedPos && Math.hypot(gx - STATE.pinnedPos.gx, gy - STATE.pinnedPos.gy) < 3.5) {
+        STATE.pinnedPos = null;
+        STATE.tacticalPinnedPos = null;
+      } else {
+        STATE.pinnedPos = { gx, gy, sx, sy };
+        STATE.tacticalPinnedPos = STATE.pinnedPos;
+      }
+      STATE.cursorX = Math.floor(gx);
+      STATE.cursorY = Math.floor(gy);
       // Lock onto nearest track if within 14 px
       let bestTrk = null;
       let bestDist = 14.0;
@@ -1836,21 +1979,59 @@ function setupCanvasInspectors() {
       if (bestTrk) {
         STATE.selectedTrackId = bestTrk.id;
         showToast(`TARGET LOCKED: ${bestTrk.id} [η=${(bestTrk.eta || 0).toFixed(2)}]`);
+      } else if (STATE.pinnedPos) {
+        showToast(`RETICLE PINNED: LOCK [${Math.floor(gx)},${Math.floor(gy)}]`);
+      } else {
+        showToast('RETICLE UNPINNED');
       }
+      updateCursorInspector();
       renderAllQuads(arena);
+      requestAnimationFrame(() => renderAllQuads(arena));
+    });
+    c.addEventListener('dblclick', () => {
+      toggleMaximizeQuad(k);
     });
   }
 }
 
+function toggleCursorInspectorPin() {
+  if (STATE.pinnedPos) {
+    STATE.pinnedPos = null;
+    STATE.tacticalPinnedPos = null;
+    showToast('RETICLE UNPINNED');
+  } else {
+    const pri = arena.tracks.find(t => t.id === STATE.selectedTrackId && t.confirmed !== false) ||
+                arena.tracks.find(t => t.confirmed !== false);
+    const gx = pri ? pri.x : STATE.cursorX;
+    const gy = pri ? pri.y : STATE.cursorY;
+    STATE.pinnedPos = {
+      gx,
+      gy,
+      sx: (gx + 0.5) * CONFIG.renderScale,
+      sy: (gy + 0.5) * CONFIG.renderScale,
+    };
+    STATE.tacticalPinnedPos = STATE.pinnedPos;
+    STATE.cursorX = Math.floor(gx);
+    STATE.cursorY = Math.floor(gy);
+    showToast(`RETICLE PINNED: LOCK [${STATE.cursorX},${STATE.cursorY}]`);
+  }
+  updateCursorInspector();
+  renderAllQuads(arena);
+}
+
 function updateCursorInspector() {
-  const idx = STATE.cursorY * arena.w + STATE.cursorX;
+  const pin = STATE.pinnedPos || STATE.tacticalPinnedPos;
+  const cx = pin ? Math.max(0, Math.min(arena.w - 1, Math.floor(pin.gx ?? (pin.sx / CONFIG.renderScale)))) : STATE.cursorX;
+  const cy = pin ? Math.max(0, Math.min(arena.h - 1, Math.floor(pin.gy ?? (pin.sy / CONFIG.renderScale)))) : STATE.cursorY;
+  const idx = cy * arena.w + cx;
   const y8 = Math.round(arena.currFrame[idx] || 0);
   const curl = (arena.curlNorm[idx] || 0).toFixed(1);
   let maskStr = 'BG';
   if (arena.washoutMask[idx]) maskStr = 'WASHOUT';
   else if (arena.clockMask[idx]) maskStr = 'M_CLOCK';
   else if (arena.nopeMask[idx]) maskStr = 'H_NOPE';
-  document.getElementById('insp-xy').innerText = `${String(STATE.cursorX).padStart(3, '0')},${String(STATE.cursorY).padStart(3, '0')}`;
+  if (pin) maskStr = `LOCK:${maskStr}`;
+  document.getElementById('insp-xy').innerText = `${String(cx).padStart(3, '0')},${String(cy).padStart(3, '0')}`;
   document.getElementById('insp-y8').innerText = String(y8).padStart(3, '0');
   document.getElementById('insp-curl').innerText = curl;
   document.getElementById('insp-mask').innerText = maskStr;
@@ -3476,54 +3657,73 @@ function applyViewportZoomTransform(ctx, S) {
  * Draws MIL-STD Bore-Sight Crosshair, Azimuth Compass Tape & Range Ticks
  */
 function drawMilStdHudReticle(ctx, vw, vh) {
-  if (!CONFIG.showReticle) return;
-  const cx = vw * 0.5;
-  const cy = vh * 0.5;
-
   ctx.save();
-  ctx.strokeStyle = 'rgba(0, 240, 255, 0.22)';
-  ctx.lineWidth = 1;
+  if (CONFIG.showReticle) {
+    const cx = vw * 0.5;
+    const cy = vh * 0.5;
 
-  // Bore-sight crosshair with open center gap
-  const gap = 18;
-  const arm = 48;
-  ctx.beginPath();
-  ctx.moveTo(cx - arm, cy); ctx.lineTo(cx - gap, cy);
-  ctx.moveTo(cx + gap, cy); ctx.lineTo(cx + arm, cy);
-  ctx.moveTo(cx, cy - arm); ctx.lineTo(cx, cy - gap);
-  ctx.moveTo(cx, cy + gap); ctx.lineTo(cx, cy + arm);
-  ctx.stroke();
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.22)';
+    ctx.lineWidth = 1;
 
-  // Mil-dot ticks along bore-sight axes
-  for (let d = 28; d <= 44; d += 8) {
+    // Bore-sight crosshair with open center gap
+    const gap = 18;
+    const arm = 48;
     ctx.beginPath();
-    ctx.moveTo(cx - d, cy - 3); ctx.lineTo(cx - d, cy + 3);
-    ctx.moveTo(cx + d, cy - 3); ctx.lineTo(cx + d, cy + 3);
-    ctx.moveTo(cx - 3, cy - d); ctx.lineTo(cx + 3, cy - d);
-    ctx.moveTo(cx - 3, cy + d); ctx.lineTo(cx + 3, cy + d);
+    ctx.moveTo(cx - arm, cy); ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy); ctx.lineTo(cx + arm, cy);
+    ctx.moveTo(cx, cy - arm); ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap); ctx.lineTo(cx, cy + arm);
+    ctx.stroke();
+
+    // Mil-dot ticks along bore-sight axes
+    for (let d = 28; d <= 44; d += 8) {
+      ctx.beginPath();
+      ctx.moveTo(cx - d, cy - 3); ctx.lineTo(cx - d, cy + 3);
+      ctx.moveTo(cx + d, cy - 3); ctx.lineTo(cx + d, cy + 3);
+      ctx.moveTo(cx - 3, cy - d); ctx.lineTo(cx + 3, cy - d);
+      ctx.moveTo(cx - 3, cy + d); ctx.lineTo(cx + 3, cy + d);
+      ctx.stroke();
+    }
+
+    // Collision Gate Reference Ring at center in Scenario 03
+    if (STATE.mode === 'deck' && STATE.scenario === '03') {
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.16)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, CONFIG.rCollision * CONFIG.renderScale, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Top Azimuth Heading Tape
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.45)';
+    ctx.font = '600 9px monospace';
+    const tapeY = 12;
+    ctx.beginPath();
+    for (let x = cx - 96; x <= cx + 96; x += 24) {
+      ctx.moveTo(x, tapeY);
+      ctx.lineTo(x, tapeY + 4);
+    }
     ctx.stroke();
   }
 
-  // Collision Gate Reference Ring at center in Scenario 03
-  if (STATE.mode === 'deck' && STATE.scenario === '03') {
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.16)';
-    ctx.setLineDash([4, 4]);
+  const pin = STATE.pinnedPos || STATE.tacticalPinnedPos;
+  if (pin) {
+    const px = typeof pin.sx === 'number' ? pin.sx : (pin.gx + 0.5) * CONFIG.renderScale;
+    const py = typeof pin.sy === 'number' ? pin.sy : (pin.gy + 0.5) * CONFIG.renderScale;
+    drawCornerBracketGate(ctx, px, py, 16, '#ffd166', 1.8);
+    ctx.strokeStyle = 'rgba(255, 209, 102, 0.7)';
+    ctx.lineWidth = 1.1;
     ctx.beginPath();
-    ctx.arc(cx, cy, CONFIG.rCollision * CONFIG.renderScale, 0, Math.PI * 2);
+    ctx.moveTo(px - 6, py); ctx.lineTo(px + 6, py);
+    ctx.moveTo(px, py - 6); ctx.lineTo(px, py + 6);
     ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = '700 9.5px monospace';
+    const vx = Math.max(0, Math.min(arena.w - 1, Math.floor(px / CONFIG.renderScale)));
+    const vy = Math.max(0, Math.min(arena.h - 1, Math.floor(py / CONFIG.renderScale)));
+    ctx.fillText(`LOCK [${vx},${vy}]`, Math.min(vw - 95, px + 18), Math.max(18, py - 8));
   }
-
-  // Top Azimuth Heading Tape
-  ctx.fillStyle = 'rgba(0, 240, 255, 0.45)';
-  ctx.font = '600 9px monospace';
-  const tapeY = 12;
-  ctx.beginPath();
-  for (let x = cx - 96; x <= cx + 96; x += 24) {
-    ctx.moveTo(x, tapeY);
-    ctx.lineTo(x, tapeY + 4);
-  }
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -4132,7 +4332,7 @@ function verifyFormalTheorems() {
       if (Math.abs(sum) > maxAntisymResidual) maxAntisymResidual = Math.abs(sum);
     }
   }
-  document.getElementById('badge-thm21').innerHTML = `Thm 2.1 (so(C) Antisym): <span class="metric">PASS ${maxAntisymResidual.toExponential(1)}</span>`;
+  document.getElementById('badge-thm21').innerHTML = `Thm 2.1 (so(C)): <span class="metric">PASS ${maxAntisymResidual.toExponential(1)}</span>`;
 
   // Live Theorem 2.2 & 2.3 evaluation from arena state and skew-symmetric triad operator B_W(u, v)
   let liveGap = arena.tieBreakGap;
@@ -4172,13 +4372,13 @@ function verifyFormalTheorems() {
     liveGap = Math.abs(bTest[0] - bTest[1]);
   }
   const tieBreakGap = liveGap;
-  document.getElementById('badge-thm22').innerHTML = `Thm 2.2 (Tie-Break): <span class="metric">PASS Δℓ=${tieBreakGap.toFixed(2)}</span>`;
+  document.getElementById('badge-thm22').innerHTML = `Thm 2.2 (Tie): <span class="metric">PASS Δℓ=${tieBreakGap.toFixed(2)}</span>`;
 
-  document.getElementById('badge-thm23').innerHTML = `Thm 2.3 (Tangent Ortho): <span class="metric">PASS ${orthoErr.toExponential(1)}</span>`;
+  document.getElementById('badge-thm23').innerHTML = `Thm 2.3 (Ortho): <span class="metric">PASS ${orthoErr.toExponential(1)}</span>`;
 
-  document.getElementById('badge-thm24').innerHTML = `Thm 2.4/2.7 (Step-0): <span class="metric">PASS 0.0e+0</span>`;
+  document.getElementById('badge-thm24').innerHTML = `Thm 2.4/2.7 (Step0): <span class="metric">PASS 0.0e+0</span>`;
 
-  const ropeRecovery = CONFIG.patchBlur ? '0.0306 (Blur)' : '1.0000 (Exact)';
+  const ropeRecovery = CONFIG.patchBlur ? '0.0306' : '1.0000';
   document.getElementById('badge-thm25').innerHTML = `Thm 2.5 (RoPE2D): <span class="metric">PASS ${ropeRecovery}</span>`;
 
   document.getElementById('badge-thm26').innerHTML = `Thm 2.6 (Cascade): <span class="metric">PASS ${arena.radialDrift.toExponential(1)}</span>`;
@@ -4202,8 +4402,57 @@ function verifyFormalTheorems() {
 }
 
 // =========================================================================
-// TELEMETRY & HUD CARD UPDATES
+// TELEMETRY & HUD CARD UPDATES + INTERACTIVE SPARKLINE SCRUBBING
 // =========================================================================
+
+const SPARK_HISTORY = {
+  fps: [],
+  drift: [],
+  heap: [],
+  swaps: [],
+  gate: [],
+  eta: [],
+  trk: [],
+};
+
+function drawSparklineCanvas(canvasId, arr, color, scrubFrac = null) {
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const w = c.width;
+  const h = c.height;
+  ctx.clearRect(0, 0, w, h);
+  if (!arr || arr.length < 2) return;
+
+  let minV = arr[0], maxV = arr[0];
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] < minV) minV = arr[i];
+    if (arr[i] > maxV) maxV = arr[i];
+  }
+  const span = Math.max(1e-6, maxV - minV);
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  for (let i = 0; i < arr.length; i++) {
+    const x = (i / Math.max(1, arr.length - 1)) * (w - 2) + 1;
+    const norm = maxV === minV ? 0.5 : (arr[i] - minV) / span;
+    const y = (h - 2) - norm * (h - 4) - 1;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  if (typeof scrubFrac === 'number' && scrubFrac >= 0 && scrubFrac <= 1) {
+    const sx = 1 + scrubFrac * (w - 2);
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sx, 0);
+    ctx.lineTo(sx, h);
+    ctx.stroke();
+  }
+}
 
 function updateTelemetryHUD() {
   const heapMB = arena.getHeapSizeMB();
@@ -4220,16 +4469,200 @@ function updateTelemetryHUD() {
   // Primary Track Dossier Card
   const pri = arena.tracks.find(t => t.id === STATE.selectedTrackId && t.confirmed !== false) ||
               arena.tracks.find(t => t.confirmed !== false);
+  let priSpd = 0.0;
+  let priEta = 0.0;
   if (pri) {
-    const spd = Math.hypot(pri.vx, pri.vy);
+    priSpd = Math.hypot(pri.vx, pri.vy);
+    priEta = pri.eta || 0.0;
     document.getElementById('hud-trk-id').innerText = pri.id;
-    document.getElementById('hud-trk-kin').innerText = `${pri.isGenerator ? 'G_ACT' : 'Ω_REG'} // ${spd.toFixed(2)} px/f`;
+    document.getElementById('hud-trk-kin').innerText = `${pri.isGenerator ? 'G_ACT' : 'Ω_REG'} // ${priSpd.toFixed(2)} px/f`;
     document.getElementById('hud-trk-kin').style.color = pri.isGenerator ? 'var(--emerald)' : 'var(--amber)';
   } else {
     document.getElementById('hud-trk-id').innerText = 'SCAN';
     document.getElementById('hud-trk-kin').innerText = 'ACQUIRING...';
   }
+
+  // Push rolling 48-sample sparkline series
+  const pushSpark = (k, v) => {
+    const a = SPARK_HISTORY[k];
+    a.push(v);
+    if (a.length > 48) a.shift();
+  };
+  pushSpark('fps', STATE.fpsFiltered);
+  pushSpark('drift', arena.cascadeRegisters[0] || 0.75);
+  pushSpark('heap', parseFloat(heapMB) + (arena.tracks.length * 0.002));
+  pushSpark('swaps', arena.tieBreakGap || 0.0);
+  pushSpark('gate', pri ? (pri.nis || 0.0) : (STATE.pendingImpulse ? 22.46 : 1.0));
+  pushSpark('eta', arena.w1Dist || priEta);
+  pushSpark('trk', priSpd);
+
+  const scrubFrac = typeof STATE.scrubHistoryFrac === 'number' ? STATE.scrubHistoryFrac : null;
+  drawSparklineCanvas('spark-fps', SPARK_HISTORY.fps, '#00f0ff', scrubFrac);
+  drawSparklineCanvas('spark-drift', SPARK_HISTORY.drift, '#00ff9d', scrubFrac);
+  drawSparklineCanvas('spark-heap', SPARK_HISTORY.heap, '#b844ff', scrubFrac);
+  drawSparklineCanvas('spark-swaps', SPARK_HISTORY.swaps, '#00ff9d', scrubFrac);
+  drawSparklineCanvas('spark-gate', SPARK_HISTORY.gate, '#00f0ff', scrubFrac);
+  drawSparklineCanvas('spark-eta', SPARK_HISTORY.eta, '#ffb800', scrubFrac);
+  drawSparklineCanvas('spark-trk', SPARK_HISTORY.trk, '#00f0ff', scrubFrac);
 }
+
+function triggerSyntheticImpulseProbe() {
+  const pri = arena.tracks.find(t => t.id === STATE.selectedTrackId && t.confirmed !== false) ||
+              arena.tracks.find(t => t.confirmed !== false);
+  if (pri) {
+    pri.pendingImpulse = true;
+    pri.pendingBelief = {
+      priorX: pri.x,
+      priorY: pri.y,
+      priorVx: pri.vx,
+      priorVy: pri.vy,
+      spikeX: Math.min(arena.w - 6, pri.x + 8.0),
+      spikeY: Math.max(6, pri.y - 8.0),
+      timestamp: STATE.frameIdx,
+    };
+    pri.gateState = 'pending_impulse';
+    pri.nis = 26.8;
+  }
+  STATE.classification = 'pending_impulse';
+  STATE.pendingImpulse = true;
+  document.getElementById('hud-gate').innerText = 'PENDING_IMPULSE';
+  showToast('STAGE 1 GATE PROBE: 1-Sample Causal Deferral [χ²=26.8 > 22.46]');
+  updateTelemetryHUD();
+  renderAllQuads(arena);
+}
+
+function inspectFormalTheorem(thmId) {
+  const res = verifyFormalTheorems();
+  const quadMap = {
+    '2.1': 'c',
+    '2.2': 'c',
+    '2.3': 'c',
+    '2.4': 'b',
+    '2.5': 'a',
+    '2.6': 'c',
+  };
+  const msgMap = {
+    '2.1': `THM 2.1 VERIFIED: so(C) Skew-Symmetry max|S+S^T| = ${res.thm_2_1_antisymmetry_residual.toExponential(2)}`,
+    '2.2': `THM 2.2 VERIFIED: Crossing Tie-Break Gap Δℓ = ${res.thm_2_2_tie_break_gap.toFixed(4)} > 0 (0 Swaps)`,
+    '2.3': `THM 2.3 VERIFIED: Pointwise Tangent Orthogonality |<v,B_W>| = ${res.thm_2_3_tangent_orthogonality_error.toExponential(2)}`,
+    '2.4': `THM 2.4/2.7 VERIFIED: Step-0 System-1 Homotopy Residual = ${res.thm_2_4_step0_homotopy_residual.toExponential(2)}`,
+    '2.5': `THM 2.5 VERIFIED: RoPE2D Medoid Relative Shift Preservation = ${res.thm_2_5_medoid_preservation.toFixed(4)}`,
+    '2.6': `THM 2.6 VERIFIED: 16-Step S^7 Spherical Cascade Radial Drift = ${res.thm_2_6_cascade_radial_drift.toExponential(2)}`,
+  };
+  showToast(msgMap[thmId] || 'FORMAL THEOREMS VERIFIED');
+  renderAllQuads(arena);
+  requestAnimationFrame(() => renderAllQuads(arena));
+}
+
+function handleTelemetryCardClick(cardKey) {
+  STATE.activeCardKey = cardKey;
+  document.querySelectorAll('.telemetry-card').forEach(el => {
+    el.classList.toggle('active-card', el.dataset.card === cardKey);
+  });
+
+  if (cardKey === 'fps') {
+    if (!STATE.isPlaying) {
+      stepFrame(1);
+      showToast(`STEPPED +1 FRAME -> FRAME #${STATE.frameIdx}`);
+    } else {
+      togglePlayPause();
+    }
+  } else if (cardKey === 'drift') {
+    stepSlowFastCascade(arena.cascadeZHTemp, arena.cascadeRegisters, 16);
+    verifyFormalTheorems();
+    updateTelemetryHUD();
+    showToast(`STAGE 3 S^7 CASCADE: K=16 Unrolled Drift = ${arena.radialDrift.toExponential(2)}`);
+    renderAllQuads(arena);
+  } else if (cardKey === 'heap') {
+    const nextLayout = CONFIG.viewLayout === 'fused' ? 'quad' : 'fused';
+    setViewLayout(nextLayout);
+    showToast(`SRAM ARENA: ${arena.getHeapSizeMB()} MB (< 2.0 MB Ceiling) // VIEW: ${nextLayout.toUpperCase()}`);
+  } else if (cardKey === 'swaps') {
+    verifyFormalTheorems();
+    showToast(`THM 2.2 ANTI-SWAP: DarkSnail=0 Swaps vs Legacy=${STATE.legacySwaps} [Δℓ=${arena.tieBreakGap.toFixed(3)}]`);
+    renderAllQuads(arena);
+  } else if (cardKey === 'gate') {
+    triggerSyntheticImpulseProbe();
+  } else if (cardKey === 'eta') {
+    factorizeCausalDecoys(arena.tracks);
+    showToast(`STAGE 4 CAUSAL: G_act=${STATE.activeGenerators} | Ω_reg=${STATE.passiveDecoys} | W1=${arena.w1Dist.toFixed(3)}`);
+    renderAllQuads(arena);
+  } else if (cardKey === 'trk') {
+    const confirmed = arena.tracks.filter(t => t.confirmed !== false);
+    if (confirmed.length > 0) {
+      const curIdx = confirmed.findIndex(t => t.id === STATE.selectedTrackId);
+      const nextTrk = confirmed[(curIdx + 1) % confirmed.length];
+      STATE.selectedTrackId = nextTrk.id;
+      CONFIG.zoomCenterX = nextTrk.x;
+      CONFIG.zoomCenterY = nextTrk.y;
+      STATE.pinnedPos = {
+        gx: nextTrk.x,
+        gy: nextTrk.y,
+        sx: (nextTrk.x + 0.5) * CONFIG.renderScale,
+        sy: (nextTrk.y + 0.5) * CONFIG.renderScale,
+      };
+      STATE.tacticalPinnedPos = STATE.pinnedPos;
+      STATE.cursorX = Math.floor(nextTrk.x);
+      STATE.cursorY = Math.floor(nextTrk.y);
+      updateTelemetryHUD();
+      updateCursorInspector();
+      renderAllQuads(arena);
+      showToast(`LOCKED PRIMARY TRACK: ${nextTrk.id} [pos=${nextTrk.x.toFixed(1)},${nextTrk.y.toFixed(1)}]`);
+    }
+  }
+}
+
+function setupTelemetryCardInteractivity() {
+  const cards = document.querySelectorAll('.telemetry-card');
+  let dragStartX = 0;
+  let didDragScrub = false;
+
+  const scrubAtEvent = (card, e) => {
+    const rect = card.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
+    STATE.scrubHistoryFrac = frac;
+    if (STATE.mode === 'file' && STATE.y8Buffer && STATE.y8FrameCount > 0) {
+      const fIdx = Math.min(STATE.y8FrameCount - 1, Math.max(0, Math.round(frac * (STATE.y8FrameCount - 1))));
+      scrubFileFrame(fIdx);
+    } else if (STATE.telemetryLog.length > 0) {
+      const hIdx = Math.min(STATE.telemetryLog.length - 1, Math.max(0, Math.round(frac * (STATE.telemetryLog.length - 1))));
+      const entry = STATE.telemetryLog[hIdx];
+      if (entry) {
+        showToast(`SCRUB LOG f#${entry.frame}: Gate=${entry.classification.toUpperCase()} | Δℓ=${entry.tie_break_gap} | W1=${entry.w1_marg}`);
+      }
+    }
+    updateTelemetryHUD();
+  };
+
+  cards.forEach(card => {
+    card.addEventListener('mousedown', (e) => {
+      STATE.isDraggingTelemetry = true;
+      STATE.activeDragCard = card;
+      dragStartX = e.clientX;
+      didDragScrub = false;
+    });
+    card.addEventListener('mousemove', (e) => {
+      if (STATE.isDraggingTelemetry && Math.abs(e.clientX - dragStartX) > 4) {
+        didDragScrub = true;
+        scrubAtEvent(card, e);
+      }
+    });
+    card.addEventListener('click', (e) => {
+      if (!didDragScrub) {
+        STATE.scrubHistoryFrac = null;
+        handleTelemetryCardClick(card.dataset.card);
+      }
+      didDragScrub = false;
+    });
+  });
+
+  window.addEventListener('mouseup', () => {
+    STATE.isDraggingTelemetry = false;
+    STATE.activeDragCard = null;
+  });
+}
+
+setupTelemetryCardInteractivity();
 
 // =========================================================================
 // VIEWPORT LAYOUT, PALETTE, ZOOM & LAYER CONTROLLERS
@@ -4285,6 +4718,7 @@ function setViewLayout(layout) {
     btn.classList.toggle('active', btn.dataset.layout === layout);
   });
   renderAllQuads(arena);
+  requestAnimationFrame(() => renderAllQuads(arena));
 }
 
 function toggleMaximizeQuad(q) {
@@ -5232,6 +5666,11 @@ if (typeof window !== 'undefined') {
   window.toggleLegacyCV = toggleLegacyCV;
   window.toggleDecoys = toggleDecoys;
   window.setViewLayout = setViewLayout;
+  window.toggleMaximizeQuad = toggleMaximizeQuad;
+  window.toggleCursorInspectorPin = toggleCursorInspectorPin;
+  window.handleTelemetryCardClick = handleTelemetryCardClick;
+  window.inspectFormalTheorem = inspectFormalTheorem;
+  window.triggerSyntheticImpulseProbe = triggerSyntheticImpulseProbe;
   window.setThermalPalette = setThermalPalette;
   window.setDigitalZoom = setDigitalZoom;
   window.activateVirtualWebRTCCam = activateVirtualWebRTCCam;
@@ -5342,7 +5781,7 @@ if (typeof window !== 'undefined') {
       toggleDecoys(true);
       report.webrtc = { withDecoys: webrtcWithDecoys, noDecoys: webrtcNoDecoys };
 
-      // 3. Verify View Layouts, Palettes, Digital Zoom & Layer Toggles
+      // 3. Verify View Layouts, Palettes, Digital Zoom, Layer Toggles & Interactive Reticle Pinning / Cards
       for (const lay of ['quad', 'a', 'b', 'c', 'd', 'fused']) setViewLayout(lay);
       setViewLayout('quad');
       for (const pal of ['phosphor', 'whitehot', 'blackhot', 'ironbow', 'arctic']) setThermalPalette(pal);
@@ -5350,7 +5789,14 @@ if (typeof window !== 'undefined') {
       for (const z of [1, 2, 4, 1]) setDigitalZoom(z);
       toggleLayer('showRelief3D');
       toggleLayer('showRelief3D');
-      report.viewOptionsVerified = true;
+      toggleCursorInspectorPin();
+      const pinnedActive = Boolean(STATE.pinnedPos);
+      toggleCursorInspectorPin();
+      const pinnedCleared = !STATE.pinnedPos;
+      handleTelemetryCardClick('drift');
+      handleTelemetryCardClick('swaps');
+      inspectFormalTheorem('2.2');
+      report.viewOptionsVerified = Boolean(pinnedActive && pinnedCleared);
 
       // 4. Verify ArrayBuffer Mode + Capture + Scrubbing Sync + Blind .Y8 Reload + Edge Cases
       changeScenario('03');

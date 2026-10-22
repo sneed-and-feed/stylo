@@ -865,6 +865,26 @@ class TestTacticalHtmlStudio:
         ]:
             assert token in html, f"Studio HTML missing ArrayBuffer export function: {token}"
 
+        # 4. Firefox (1366x650) & HiDPI Layout Rules + Interactive Canvas/Telemetry Controls
+        for token in [
+            "scrollbar-width: thin",
+            "container-type: size",
+            "min(100cqw, 100cqh)",
+            "toggleMaximizeQuad",
+            "toggleCursorInspectorPin",
+            "handleTelemetryCardClick",
+            "inspectFormalTheorem",
+            "triggerSyntheticImpulseProbe",
+            'id="spark-fps"',
+            'id="spark-drift"',
+            'id="spark-heap"',
+            'id="spark-swaps"',
+            'id="spark-gate"',
+            'id="spark-eta"',
+            'id="spark-trk"',
+        ]:
+            assert token in html, f"Studio HTML missing Firefox layout or interactive control token: {token}"
+
     def test_studio_headless_runtime_selftest(self):
         """Executes ?selftest=1 in headless Chromium to verify live HTML tracking and exports."""
         import http.server
@@ -942,6 +962,7 @@ class TestTacticalHtmlStudio:
         assert report["webrtc"]["noDecoys"]["legacyCV"] is False
         assert report["webrtc"]["noDecoys"]["enableDecoys"] is False
         assert report["webrtc"]["noDecoys"]["omegaReg"] == 0
+        assert report.get("viewOptionsVerified") is True
 
         # 3. ArrayBuffer Exports, Scrubbing Synchronization & Blind .Y8 Reload
         exports = report["arrayBufferExports"]
