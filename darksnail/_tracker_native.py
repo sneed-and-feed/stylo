@@ -559,28 +559,25 @@ def polish_exact_sphere_norm_f32(v_in: np.ndarray, target_sq: float) -> Tuple[np
 
     target_sq_f = np.float32(target_sq)
 
-    # Pass 1: Coordinate-wise ULP refinement
+    # Pass 1: Direct coordinate-wise ULP refinement around v[k] (zero cancellation)
     for _iter in range(4):
         for k in range(d):
             vk = v[k]
-            other_sq = np.float32(cur_sq - np.float32(vk * vk))
-            res = np.float32(target_sq_f - other_sq)
-            if res >= 0.0:
-                sgn = 1.0 if vk >= 0.0 else -1.0
-                base = np.float32(sgn * np.sqrt(res))
-                for step in range(-4, 5):
-                    cand = ulp_add_f32(base, step)
-                    old_vk = v[k]
-                    v[k] = cand
-                    cand_sq = eval_sq(v)
-                    err = abs(float(cand_sq - target_sq_f))
-                    if err < best_err:
-                        best_err = err
-                        cur_sq = cand_sq
-                        if best_err == 0.0:
-                            return v, 0.0
-                    else:
-                        v[k] = old_vk
+            for step in range(-4, 5):
+                if step == 0:
+                    continue
+                cand = ulp_add_f32(vk, step)
+                old_vk = v[k]
+                v[k] = cand
+                cand_sq = eval_sq(v)
+                err = abs(float(cand_sq - target_sq_f))
+                if err < best_err:
+                    best_err = err
+                    cur_sq = cand_sq
+                    if best_err == 0.0:
+                        return v, 0.0
+                else:
+                    v[k] = old_vk
 
     # Pass 2: 2-coordinate ULP refinement
     if best_err > 0.0:

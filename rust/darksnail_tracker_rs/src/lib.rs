@@ -214,33 +214,47 @@ static mut STATIC_GLOBAL_ARENA: TrackerStateArena = TrackerStateArena::new_const
 // --- Fast Math Helper Functions ---
 
 #[inline(always)]
+fn fmul_ieee(a: f32, b: f32) -> f32 {
+    core::hint::black_box(a * b)
+}
+
+#[inline(always)]
 fn fast_sqrt(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
     } else {
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            use core::arch::x86_64::*;
-            let v = _mm_set_ss(x);
-            let s = _mm_sqrt_ss(v);
-            _mm_cvtss_f32(s)
-        }
-        #[cfg(not(target_arch = "x86_64"))]
+        #[cfg(feature = "std")]
         {
-            // High-precision Newton-Raphson float32 square root in pure stable #![no_std]
-            let mut y = f32::from_bits((x.to_bits() >> 1) + 0x1fc0_0000);
-            y = 0.5 * (y + x / y);
-            y = 0.5 * (y + x / y);
-            y = 0.5 * (y + x / y);
-            y = 0.5 * (y + x / y);
-            y
+            x.sqrt()
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            #[cfg(target_arch = "x86_64")]
+            unsafe {
+                use core::arch::x86_64::*;
+                let v = _mm_set_ss(x);
+                let s = _mm_sqrt_ss(v);
+                _mm_cvtss_f32(s)
+            }
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                // Exact IEEE-754 float32 square root via f64 Newton-Raphson in #![no_std]
+                let xd = x as f64;
+                let mut y = f64::from_bits((xd.to_bits() >> 1) + 0x1ff8_0000_0000_0000);
+                y = 0.5 * (y + xd / y);
+                y = 0.5 * (y + xd / y);
+                y = 0.5 * (y + xd / y);
+                y = 0.5 * (y + xd / y);
+                y = 0.5 * (y + xd / y);
+                y as f32
+            }
         }
     }
 }
 
 #[inline(always)]
 fn fast_hypot(x: f32, y: f32) -> f32 {
-    fast_sqrt(x * x + y * y)
+    fast_sqrt(fmul_ieee(x, x) + fmul_ieee(y, y))
 }
 
 #[inline(always)]
@@ -601,11 +615,11 @@ unsafe fn beltrami_curl_scalar(
             let p21 = *frame.add(r2 + x);
             let p22 = *frame.add(r2 + x + 1);
 
-            let gx = grad_scale * ((p02 + 2.0 * p12 + p22) - (p00 + 2.0 * p10 + p20));
-            let gy = grad_scale * ((p20 + 2.0 * p21 + p22) - (p00 + 2.0 * p01 + p02));
+            let gx = fmul_ieee(grad_scale, (p02 + fmul_ieee(2.0, p12) + p22) - (p00 + fmul_ieee(2.0, p10) + p20));
+            let gy = fmul_ieee(grad_scale, (p20 + fmul_ieee(2.0, p21) + p22) - (p00 + fmul_ieee(2.0, p01) + p02));
             let mut sal = fast_hypot(gx, gy);
 
-            let curv_x = (p10 + p12 - 2.0 * p11).abs();
+            let curv_x = (p10 + p12 - fmul_ieee(2.0, p11)).abs();
             let is_washout = p11 > sat_thresh && curv_x < curv_thresh;
 
             if is_washout {
@@ -985,7 +999,7 @@ fn ulp_add(f: f32, delta: i32) -> f32 {
 fn eval_norm_sq(v: &[f32; CASCADE_DIM]) -> f32 {
     let mut s = 0.0f32;
     for i in 0..CASCADE_DIM {
-        s += v[i] * v[i];
+        s += fmul_ieee(v[i], v[i]);
     }
     s
 }
@@ -997,30 +1011,27 @@ fn exact_sphere_norm_ulp_polish(v: &mut [f32; CASCADE_DIM], target_sq: f32) {
         return;
     }
 
-    // Try coordinate-wise refinement
+    // Pass 1: Direct coordinate-wise ULP refinement around v[k] (zero cancellation)
     for _iter in 0..4 {
         for k in 0..CASCADE_DIM {
             let vk = v[k];
-            let other_sq = cur_sq - vk * vk;
-            let res = target_sq - other_sq;
-            if res >= 0.0 {
-                let sgn = if vk >= 0.0 { 1.0f32 } else { -1.0f32 };
-                let base = sgn * fast_sqrt(res);
-                for step in -4..=4 {
-                    let cand = ulp_add(base, step);
-                    let old_vk = v[k];
-                    v[k] = cand;
-                    let cand_sq = eval_norm_sq(v);
-                    let err = (cand_sq - target_sq).abs();
-                    if err < best_err {
-                        best_err = err;
-                        cur_sq = cand_sq;
-                        if best_err == 0.0 {
-                            return;
-                        }
-                    } else {
-                        v[k] = old_vk;
+            for step in -4..=4 {
+                if step == 0 {
+                    continue;
+                }
+                let cand = ulp_add(vk, step);
+                let old_vk = v[k];
+                v[k] = cand;
+                let cand_sq = eval_norm_sq(v);
+                let err = (cand_sq - target_sq).abs();
+                if err < best_err {
+                    best_err = err;
+                    cur_sq = cand_sq;
+                    if best_err == 0.0 {
+                        return;
                     }
+                } else {
+                    v[k] = old_vk;
                 }
             }
         }
@@ -1037,11 +1048,11 @@ fn exact_sphere_norm_ulp_polish(v: &mut [f32; CASCADE_DIM], target_sq: f32) {
                     if k1 == k2 {
                         continue;
                     }
-                    let other_sq = eval_norm_sq(v) - v[k2] * v[k2];
+                    let other_sq = eval_norm_sq(v) - fmul_ieee(v[k2], v[k2]);
                     let res = target_sq - other_sq;
                     if res >= 0.0 {
                         let sgn = if v[k2] >= 0.0 { 1.0f32 } else { -1.0f32 };
-                        let base2 = sgn * fast_sqrt(res);
+                        let base2 = fmul_ieee(sgn, fast_sqrt(res));
                         for step2 in -3..=3 {
                             let c2 = ulp_add(base2, step2);
                             let old_vk2 = v[k2];
@@ -1095,7 +1106,7 @@ pub unsafe extern "C" fn skew_symmetric_triad_cascade_step_f32(
     }
 
     // Initial norm target
-    let target_sq: f32 = v.iter().map(|&x| x * x).sum();
+    let target_sq = eval_norm_sq(&v);
     let r0 = fast_sqrt(target_sq);
 
     // If initial norm is zero, output is zero identically
@@ -1128,7 +1139,7 @@ pub unsafe extern "C" fn skew_symmetric_triad_cascade_step_f32(
                         let w_ijk = *w_rec.add(i * 64 + j * 8 + k);
                         let w_ikj = *w_rec.add(i * 64 + k * 8 + j);
                         let s_ijk = w_ijk - w_ikj; // exact antisymmetry
-                        sum_k += u_i * v[j] * s_ijk;
+                        sum_k += fmul_ieee(fmul_ieee(u_i, v[j]), s_ijk);
                     }
                 }
                 b_uv[k] = sum_k;
@@ -1138,18 +1149,21 @@ pub unsafe extern "C" fn skew_symmetric_triad_cascade_step_f32(
             for k in 0..CASCADE_DIM {
                 let j1 = (k + 1) % CASCADE_DIM;
                 let j2 = (k + CASCADE_DIM - 1) % CASCADE_DIM;
-                b_uv[k] = u_vec[k] * (v[j1] - v[j2]);
+                b_uv[k] = fmul_ieee(u_vec[k], v[j1] - v[j2]);
             }
         }
 
         // 2-pass Kahan/Parlett tangent projection: <v, delta_v> = 0 (Theorem 2.3)
-        let v_norm_sq: f32 = v.iter().map(|&x| x * x).sum();
+        let v_norm_sq = eval_norm_sq(&v);
         if v_norm_sq > 1e-30 {
             for _ in 0..2 {
-                let inner: f32 = v.iter().zip(b_uv.iter()).map(|(&a, &b)| a * b).sum();
+                let mut inner = 0.0f32;
+                for k in 0..CASCADE_DIM {
+                    inner += fmul_ieee(v[k], b_uv[k]);
+                }
                 let proj = inner / v_norm_sq;
                 for k in 0..CASCADE_DIM {
-                    b_uv[k] -= proj * v[k];
+                    b_uv[k] -= fmul_ieee(proj, v[k]);
                 }
             }
         }
@@ -1157,16 +1171,16 @@ pub unsafe extern "C" fn skew_symmetric_triad_cascade_step_f32(
         // Tangent update: v_next = v + gamma * delta_v
         let mut v_upd = [0.0f32; CASCADE_DIM];
         for k in 0..CASCADE_DIM {
-            v_upd[k] = v[k] + gamma * b_uv[k];
+            v_upd[k] = v[k] + fmul_ieee(gamma, b_uv[k]);
         }
 
         // Spherical Retraction: scale back to r0
-        let upd_sq: f32 = v_upd.iter().map(|&x| x * x).sum();
+        let upd_sq = eval_norm_sq(&v_upd);
         if upd_sq > 1e-30 {
             let r_upd = fast_sqrt(upd_sq);
             let scale = r0 / r_upd;
             for k in 0..CASCADE_DIM {
-                v[k] = v_upd[k] * scale;
+                v[k] = fmul_ieee(v_upd[k], scale);
             }
         }
     }
@@ -1180,7 +1194,7 @@ pub unsafe extern "C" fn skew_symmetric_triad_cascade_step_f32(
     }
 
     // Compute final radial drift
-    let final_sq: f32 = v.iter().map(|&x| x * x).sum();
+    let final_sq = eval_norm_sq(&v);
     let drift = (final_sq - target_sq).abs();
     if !radial_drift_out.is_null() {
         *radial_drift_out = drift;
@@ -1215,23 +1229,27 @@ pub unsafe extern "C" fn skew_symmetric_triad_operator_f32(
                 let w_ijk = *w.add(i * d * d + j * d + k);
                 let w_ikj = *w.add(i * d * d + k * d + j);
                 let s_ijk = w_ijk - w_ikj;
-                sum_k += u_i * v_j * s_ijk;
+                sum_k += fmul_ieee(fmul_ieee(u_i, v_j), s_ijk);
             }
         }
         *out.add(k) = sum_k;
     }
 
     // Two-pass Kahan/Parlett tangent projection
-    let v_norm_sq: f32 = (0..d).map(|k| (*v.add(k)) * (*v.add(k))).sum();
+    let mut v_norm_sq = 0.0f32;
+    for k in 0..d {
+        let vk = *v.add(k);
+        v_norm_sq += fmul_ieee(vk, vk);
+    }
     if v_norm_sq > 1e-30 {
         for _ in 0..2 {
             let mut dot = 0.0f32;
             for k in 0..d {
-                dot += (*v.add(k)) * (*out.add(k));
+                dot += fmul_ieee(*v.add(k), *out.add(k));
             }
             let proj = dot / v_norm_sq;
             for k in 0..d {
-                *out.add(k) -= proj * (*v.add(k));
+                *out.add(k) -= fmul_ieee(proj, *v.add(k));
             }
         }
     }
@@ -1239,7 +1257,7 @@ pub unsafe extern "C" fn skew_symmetric_triad_operator_f32(
     // Recalculate inner product after projection
     let mut final_inner = 0.0f32;
     for k in 0..d {
-        final_inner += (*v.add(k)) * (*out.add(k));
+        final_inner += fmul_ieee(*v.add(k), *out.add(k));
     }
     final_inner.abs()
 }
