@@ -1005,7 +1005,7 @@ fn eval_norm_sq(v: &[f32; CASCADE_DIM]) -> f32 {
 }
 
 fn exact_sphere_norm_ulp_polish(v: &mut [f32; CASCADE_DIM], target_sq: f32) {
-    let mut cur_sq = eval_norm_sq(v);
+    let cur_sq = eval_norm_sq(v);
     let mut best_err = (cur_sq - target_sq).abs();
     if best_err == 0.0 {
         return;
@@ -1026,7 +1026,6 @@ fn exact_sphere_norm_ulp_polish(v: &mut [f32; CASCADE_DIM], target_sq: f32) {
                 let err = (cand_sq - target_sq).abs();
                 if err < best_err {
                     best_err = err;
-                    cur_sq = cand_sq;
                     if best_err == 0.0 {
                         return;
                     }
