@@ -640,11 +640,9 @@ class TestMemoryAndPerformanceSuite:
         )
 
     def test_steady_state_heap_growth_and_live_diagnostics_1000_frames(self):
-        """Steady-state heap growth over 1,000 active multi-target frames is < 2048 B with bounded TrackState.history and live diagnostics."""
+        """Steady-state heap growth over 1,000 active multi-target frames is < 2048 B on default TrackerConfig for both NumPy and Rust backends, with bounded TrackState.history and live diagnostics."""
         if DarkSnailHighSpeedTracker is None:
             pytest.skip("DarkSnailHighSpeedTracker not yet imported")
-
-        import gc
 
         frame_multi = _make_synthetic_frame(
             h=128,
@@ -652,46 +650,67 @@ class TestMemoryAndPerformanceSuite:
             targets=[(25.0, 25.0, 0.9), (29.5, 28.5, 0.9), (80.0, 80.0, 0.85)],
         )
         dt = 1.0 / 240.0
-        config = TrackerConfig(detection_threshold=20.0) if TrackerConfig is not None else None
-        tracemalloc.start()
-        try:
-            py_tracker = DarkSnailHighSpeedTracker(backend="numpy", config=config)
 
-            # Warm up 30 frames so ring buffer and active tracks reach steady state
-            last_out = None
-            for _ in range(30):
-                last_out = py_tracker.update(frame_multi, dt)
+        for backend_name in ("numpy", "rust"):
+            if backend_name == "rust" and not (
+                _tracker_native is not None
+                and hasattr(_tracker_native, "is_available")
+                and _tracker_native.is_available()
+            ):
+                continue
 
-            gc.collect()
-            snap_start, _ = tracemalloc.get_traced_memory()
-            for _ in range(1000):
-                last_out = py_tracker.update(frame_multi, dt)
-            gc.collect()
-            snap_end, _ = tracemalloc.get_traced_memory()
-        finally:
-            tracemalloc.stop()
+            tracemalloc.start()
+            try:
+                tracker = DarkSnailHighSpeedTracker(backend=backend_name)
 
-        steady_growth_bytes = max(0, snap_end - snap_start)
-        assert steady_growth_bytes < 2048, (
-            f"Steady-state heap growth {steady_growth_bytes} B >= 2048 B over 1,000 multi-target frames!"
-        )
-        for trk in py_tracker.active_tracks:
-            assert len(trk.history) <= py_tracker.config.ring_buffer_size, (
-                f"TrackState.history grew unboundedly to {len(trk.history)} > {py_tracker.config.ring_buffer_size}"
+                # Warm up 30 frames so ring buffer and active tracks reach steady state
+                last_out = None
+                for _ in range(30):
+                    last_out = tracker.update(frame_multi, dt)
+
+                snap_start, _ = tracemalloc.get_traced_memory()
+                for _ in range(1000):
+                    last_out = tracker.update(frame_multi, dt)
+                snap_end, _ = tracemalloc.get_traced_memory()
+            finally:
+                tracemalloc.stop()
+
+            steady_growth_bytes = max(0, snap_end - snap_start)
+            assert steady_growth_bytes < 2048, (
+                f"[{backend_name}] Steady-state heap growth {steady_growth_bytes} B >= 2048 B over 1,000 multi-target frames!"
             )
-        assert last_out is not None
-        diag = last_out["diagnostics"]
-        assert diag["radial_drift"] == 0.0
-        assert diag["max_orthogonality_error"] <= 1.0e-8
-        assert diag["tie_break_gap"] > 0.0
+            assert last_out is not None
+            assert len(last_out["tracks"]) == 3, (
+                f"[{backend_name}] Expected 3 tracks on 3-target frame with default TrackerConfig, got {len(last_out['tracks'])}"
+            )
+            for trk in tracker.active_tracks:
+                assert len(trk.history) <= tracker.config.ring_buffer_size, (
+                    f"TrackState.history grew unboundedly to {len(trk.history)} > {tracker.config.ring_buffer_size}"
+                )
+            diag = last_out["diagnostics"]
+            assert diag["radial_drift"] == 0.0
+            assert diag["max_orthogonality_error"] <= 1.0e-8
+            assert diag["tie_break_gap"] > 0.0
+
+        # Also verify seamless track state handoff when resolution transitions between 128x128 (native) and 256x256 (NumPy)
+        auto_tracker = DarkSnailHighSpeedTracker(backend="auto")
+        frame_256 = _make_synthetic_frame(
+            h=256,
+            w=256,
+            targets=[(25.0, 25.0, 0.9), (29.5, 28.5, 0.9), (80.0, 80.0, 0.85)],
+        )
+        for _ in range(5):
+            out_128 = auto_tracker.update(frame_multi, dt)
+        out_256 = auto_tracker.update(frame_256, dt)
+        assert len(out_256["tracks"]) >= len(out_128["tracks"])
+        assert len(auto_tracker.active_tracks) >= 3
 
     def test_vectorized_python_throughput_fps(self):
         """Vectorized Python single-core throughput > 165 FPS (< 6.0 ms/frame) on 128x128."""
         if DarkSnailHighSpeedTracker is None:
             pytest.skip("DarkSnailHighSpeedTracker not yet imported")
 
-        config = TrackerConfig(detection_threshold=20.0) if TrackerConfig is not None else None
-        tracker = DarkSnailHighSpeedTracker(backend="numpy", config=config)
+        tracker = DarkSnailHighSpeedTracker(backend="numpy")
         frame = _make_synthetic_frame(h=128, w=128, targets=[(30.0, 40.0, 0.85)])
         dt = 1.0 / 240.0
 
@@ -904,7 +923,7 @@ class TestTacticalHtmlStudio:
             sc_data = report["scenarios"][sc]
             assert sc_data["darkSnailSwaps"] == 0, f"Scenario {sc} had ID swaps: {sc_data}"
             assert sc_data["darkSnailRmse"] < 1.0, f"Scenario {sc} RMSE > 1.0 px: {sc_data}"
-            assert sc_data["radialDrift"] < 1e-6, f"Scenario {sc} radial drift violation: {sc_data}"
+            assert sc_data["radialDrift"] == 0.0, f"Scenario {sc} radial drift violation: {sc_data}"
 
         # Stage 1 & Stage 2 verification: no duplicate skirt medoids & zero false target-flank clutter
         assert report["scenarios"]["03"]["activeMedoids"] == 4

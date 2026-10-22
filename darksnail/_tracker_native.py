@@ -211,7 +211,7 @@ if NATIVE_LIBRARY_AVAILABLE and _NATIVE_LIB is not None:
     _NATIVE_LIB.tracker_step_frame.restype = ctypes.c_int32
     _NATIVE_LIB.tracker_step_frame.argtypes = [
         ctypes.c_void_p,
-        np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
+        ctypes.c_void_p,
         ctypes.c_int32,
         ctypes.c_int32,
         ctypes.c_float,
@@ -285,21 +285,21 @@ if NATIVE_LIBRARY_AVAILABLE and _NATIVE_LIB is not None:
     _NATIVE_LIB.tracker_get_clock_mask.restype = ctypes.c_int32
     _NATIVE_LIB.tracker_get_clock_mask.argtypes = [
         ctypes.c_void_p,
-        np.ctypeslib.ndpointer(dtype=np.uint8, flags="C_CONTIGUOUS"),
+        ctypes.c_void_p,
         ctypes.c_int32,
     ]
 
     _NATIVE_LIB.tracker_get_nope_mask.restype = ctypes.c_int32
     _NATIVE_LIB.tracker_get_nope_mask.argtypes = [
         ctypes.c_void_p,
-        np.ctypeslib.ndpointer(dtype=np.uint8, flags="C_CONTIGUOUS"),
+        ctypes.c_void_p,
         ctypes.c_int32,
     ]
 
     _NATIVE_LIB.tracker_get_salience_map.restype = ctypes.c_int32
     _NATIVE_LIB.tracker_get_salience_map.argtypes = [
         ctypes.c_void_p,
-        np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS"),
+        ctypes.c_void_p,
         ctypes.c_int32,
     ]
 
@@ -682,9 +682,16 @@ class NativeTrackerArenaWrapper:
             raise MemoryError("Failed to allocate TrackerStateArena in native library.")
 
         self._out_tracks_buffer = (CTrackOutput * 24)()
+        self._frame_buf = np.zeros((128, 128), dtype=np.float32)
+        self._frame_ptr = ctypes.c_void_p(self._frame_buf.ctypes.data)
         self._clock_mask = np.zeros((128, 128), dtype=np.uint8)
+        self._clock_mask_bool = self._clock_mask.view(bool)
+        self._clock_mask_ptr = ctypes.c_void_p(self._clock_mask.ctypes.data)
         self._nope_mask = np.zeros((128, 128), dtype=np.uint8)
+        self._nope_mask_bool = self._nope_mask.view(bool)
+        self._nope_mask_ptr = ctypes.c_void_p(self._nope_mask.ctypes.data)
         self._salience_map = np.zeros((128, 128), dtype=np.float32)
+        self._salience_map_ptr = ctypes.c_void_p(self._salience_map.ctypes.data)
         self._track_dicts = [
             {
                 "id": 0,
@@ -720,15 +727,23 @@ class NativeTrackerArenaWrapper:
         """
         if dt < 0.0:
             raise ValueError(f"dt must be non-negative, got {dt}")
-        f32_frame = np.ascontiguousarray(frame, dtype=np.float32)
-        f_max = float(np.max(f32_frame)) if f32_frame.size > 0 else 0.0
-        if f_max > 1.5:
-            f32_frame = np.ascontiguousarray(f32_frame * (1.0 / 255.0), dtype=np.float32)
-        H, W = f32_frame.shape
+        H, W = frame.shape
+        if H == 128 and W == 128:
+            np.copyto(self._frame_buf, frame, casting="unsafe")
+            f_max = float(np.max(self._frame_buf))
+            if f_max > 1.5:
+                self._frame_buf *= np.float32(1.0 / 255.0)
+            frame_ptr = self._frame_ptr
+        else:
+            f32_frame = np.ascontiguousarray(frame, dtype=np.float32)
+            f_max = float(np.max(f32_frame)) if f32_frame.size > 0 else 0.0
+            if f_max > 1.5:
+                f32_frame *= np.float32(1.0 / 255.0)
+            frame_ptr = ctypes.c_void_p(f32_frame.__array_interface__["data"][0])
 
         num_tracks = _NATIVE_LIB.tracker_step_frame(
             self._arena,
-            f32_frame,
+            frame_ptr,
             ctypes.c_int32(H),
             ctypes.c_int32(W),
             ctypes.c_float(dt),
@@ -771,26 +786,44 @@ class NativeTrackerArenaWrapper:
 
     def get_clock_mask(self, h: int = 128, w: int = 128) -> np.ndarray:
         if h == 128 and w == 128:
-            _NATIVE_LIB.tracker_get_clock_mask(self._arena, self._clock_mask, 16384)
+            _NATIVE_LIB.tracker_get_clock_mask(self._arena, self._clock_mask_ptr, 16384)
             return self._clock_mask
         mask = np.zeros((h * w), dtype=np.uint8)
-        _NATIVE_LIB.tracker_get_clock_mask(self._arena, mask, h * w)
+        _NATIVE_LIB.tracker_get_clock_mask(
+            self._arena, ctypes.c_void_p(mask.__array_interface__["data"][0]), h * w
+        )
         return mask.reshape((h, w))
+
+    def get_clock_mask_bool(self, h: int = 128, w: int = 128) -> np.ndarray:
+        if h == 128 and w == 128:
+            _NATIVE_LIB.tracker_get_clock_mask(self._arena, self._clock_mask_ptr, 16384)
+            return self._clock_mask_bool
+        return self.get_clock_mask(h, w).view(bool)
 
     def get_nope_mask(self, h: int = 128, w: int = 128) -> np.ndarray:
         if h == 128 and w == 128:
-            _NATIVE_LIB.tracker_get_nope_mask(self._arena, self._nope_mask, 16384)
+            _NATIVE_LIB.tracker_get_nope_mask(self._arena, self._nope_mask_ptr, 16384)
             return self._nope_mask
         mask = np.zeros((h * w), dtype=np.uint8)
-        _NATIVE_LIB.tracker_get_nope_mask(self._arena, mask, h * w)
+        _NATIVE_LIB.tracker_get_nope_mask(
+            self._arena, ctypes.c_void_p(mask.__array_interface__["data"][0]), h * w
+        )
         return mask.reshape((h, w))
+
+    def get_nope_mask_bool(self, h: int = 128, w: int = 128) -> np.ndarray:
+        if h == 128 and w == 128:
+            _NATIVE_LIB.tracker_get_nope_mask(self._arena, self._nope_mask_ptr, 16384)
+            return self._nope_mask_bool
+        return self.get_nope_mask(h, w).view(bool)
 
     def get_salience_map(self, h: int = 128, w: int = 128) -> np.ndarray:
         if h == 128 and w == 128:
-            _NATIVE_LIB.tracker_get_salience_map(self._arena, self._salience_map, 16384)
+            _NATIVE_LIB.tracker_get_salience_map(self._arena, self._salience_map_ptr, 16384)
             return self._salience_map
         sal = np.zeros((h * w), dtype=np.float32)
-        _NATIVE_LIB.tracker_get_salience_map(self._arena, sal, h * w)
+        _NATIVE_LIB.tracker_get_salience_map(
+            self._arena, ctypes.c_void_p(sal.__array_interface__["data"][0]), h * w
+        )
         return sal.reshape((h, w))
 
 

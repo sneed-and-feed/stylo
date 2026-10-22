@@ -1026,9 +1026,40 @@ def run_monte_carlo_sweep(
     false_triggers = 0
     snr_levels = np.linspace(20.0, 10.0, n_trials)
 
-    gate_cfg = InnovationSpikeGateConfig(dim=dim, nis_probability=nis_probability)
+    dt = 1.0 / 240.0
+    dt2 = 0.5 * dt * dt
+    gate_cfg = InnovationSpikeGateConfig(dim=dim, nis_probability=nis_probability).scale_for_dt(dt)
 
-    R_diag = np.array(
+    Phi = np.array(
+        [
+            [1.0, 0.0, dt, 0.0, dt2, 0.0],
+            [0.0, 1.0, 0.0, dt, 0.0, dt2],
+            [0.0, 0.0, 1.0, 0.0, dt, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, dt],
+            [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    Phi_inv = np.array(
+        [
+            [1.0, 0.0, -dt, 0.0, dt2, 0.0],
+            [0.0, 1.0, 0.0, -dt, 0.0, dt2],
+            [0.0, 0.0, 1.0, 0.0, -dt, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, -dt],
+            [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    Q = np.diag([0.01 * dt, 0.01 * dt, 0.05 * dt, 0.05 * dt, 0.20 * dt, 0.20 * dt]).astype(
+        np.float64
+    )
+    P_post = np.diag([0.25, 0.25, 1.0, 1.0, 4.0, 4.0]).astype(np.float64)
+    P_minus = Phi @ P_post @ Phi.T + Q
+    L_P = np.linalg.cholesky(P_minus)
+
+    R_base_diag = np.array(
         [
             gate_cfg.pos_sigma**2,
             gate_cfg.pos_sigma**2,
@@ -1037,31 +1068,28 @@ def run_monte_carlo_sweep(
             gate_cfg.acc_sigma**2,
             gate_cfg.acc_sigma**2,
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
-    # Steady-state prior state covariance P_minus (diagonal 6-DOF prior uncertainty)
-    P_minus_diag = np.array([0.25, 0.25, 1.0, 1.0, 4.0, 4.0], dtype=np.float64)
-    R_base_diag = R_diag.astype(np.float64)
 
     for trial_idx in range(n_trials):
         snr_db = float(snr_levels[trial_idx])
         # SNR-dependent measurement noise variance inflation factor (10 dB -> ~1.316x, 20 dB -> ~1.10x)
         snr_amplitude_ratio = 10.0 ** (-snr_db / 20.0)
         R_snr_diag = R_base_diag * (1.0 + snr_amplitude_ratio)
+        R_snr = np.diag(R_snr_diag)
+        sigma_R = np.sqrt(R_snr_diag)
 
-        # Total 6-DOF innovation covariance S = H P_minus H^T + R(SNR)
-        S_diag = P_minus_diag + R_snr_diag
-        sigma_S = np.sqrt(S_diag)
+        # Draw independent prior state prediction errors eps_x ~ N(0, P_minus)
+        # and physical 3-point finite-difference measurement errors eps_z ~ N(0, R(SNR))
+        eps_x = rng.normal(0.0, 1.0, size=(steps_per_trial, dim)) @ L_P.T
+        eps_z = rng.normal(0.0, sigma_R, size=(steps_per_trial, dim))
+        y_raw = eps_z - eps_x
 
-        # Draw physical unwhitened 6-DOF innovations y ~ N(0, S) directly in physical units
-        physical_innovations = rng.normal(loc=0.0, scale=sigma_S, size=(steps_per_trial, dim)).astype(
-            np.float32
-        )
-
-        # Apply adaptive Kalman innovation covariance whitening S^{-1/2} y
-        inv_sqrt_S = (1.0 / sigma_S).astype(np.float32)
-        whitened_innovations = physical_innovations * inv_sqrt_S
-        d_mah_sq = np.sum(whitened_innovations * whitened_innovations, axis=-1)
+        # Apply Stage 1 Phi^{-1}(dt) pullback operator and evaluate full-covariance Mahalanobis distance
+        y_pb = y_raw @ Phi_inv.T
+        S_pb = Phi_inv @ (P_minus + R_snr) @ Phi_inv.T
+        S_pb_inv = np.linalg.inv(S_pb)
+        d_mah_sq = np.einsum("bi,ij,bj->b", y_pb, S_pb_inv, y_pb)
 
         false_triggers += int(np.sum(d_mah_sq > threshold))
 
@@ -1324,18 +1352,21 @@ def run_coast_vs_active_collision_breakdown(
 
 def format_coast_vs_active_collision_tables(breakdown: Dict[str, Any]) -> str:
     """Formats Coast vs. Active-Collision breakdown into publication-grade console tables."""
+    nc = breakdown.get("nominal_coast_stream", {})
+    skip_pct = float(nc.get("phi_inv_skip_rate_pct", 100.0))
     lines = []
     lines.append("=" * 104)
     lines.append(" COAST VS. ACTIVE-COLLISION THROUGHPUT & LATENCY BREAKDOWN (128x128 STREAMING)")
     lines.append("=" * 104)
-    lines.append(" 1. NOMINAL COAST STREAM (PER-TICK TARGET MUTATION, 99.88% COATING/SMOOTHING)")
+    lines.append(
+        f" 1. NOMINAL COAST STREAM (PER-TICK TARGET MUTATION, {skip_pct:.2f}% COASTING/SMOOTHING)"
+    )
     lines.append("-" * 104)
     lines.append(
         f"{'Backend':<26} | {'Res':<7} | {'Frames':<6} | {'Throughput (FPS)':<18} | {'Latency (us/frame)':<20} | {'Speedup':<9}"
     )
     lines.append("-" * 104)
 
-    nc = breakdown.get("nominal_coast_stream", {})
     py_nc = nc.get("vectorized_python", {})
     rs_nc = nc.get("compiled_rust_simd", {})
     speedup_nc = nc.get("speedup_factor", 1.0)

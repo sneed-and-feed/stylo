@@ -279,6 +279,7 @@ class DarkSnailHighSpeedTracker:
         self._cascade_z_L = array("d", [1.0, 0.5, -0.5, 0.25, -0.25, 0.125, -0.125, 0.0625])
         self._cascade_target_sq: float = sum(c * c for c in self._cascade_z_L)
         self._cascade_r0: float = math.sqrt(self._cascade_target_sq)
+        self._last_native_tracks: Optional[List[Dict[str, Any]]] = None
 
     def reset(self) -> None:
         """Resets tracker state, active tracks, circular history buffer, and native arena."""
@@ -290,6 +291,7 @@ class DarkSnailHighSpeedTracker:
         self.ring_ptr = 0
         self.last_clock_mask = None
         self.last_nope_mask = None
+        self._last_native_tracks = None
         init_z = (1.0, 0.5, -0.5, 0.25, -0.25, 0.125, -0.125, 0.0625)
         for idx, val in enumerate(init_z):
             self._cascade_z_L[idx] = val
@@ -316,6 +318,8 @@ class DarkSnailHighSpeedTracker:
         second-derivative signatures.
         """
         I = frame.astype(np.float32)
+        f_max = float(np.max(I)) if I.size > 0 else 0.0
+        scale = (1.0 / 255.0) if (0.0 < f_max <= 1.5) else 1.0
 
         # One-sided forward and backward differences at every pixel
         pad_I = np.pad(I, ((1, 1), (1, 1)), mode="edge")
@@ -325,7 +329,7 @@ class DarkSnailHighSpeedTracker:
         dy2 = pad_I[2:, 1:-1] - pad_I[1:-1, 1:-1]
 
         grad_sq = 0.5 * (dx1 * dx1 + dx2 * dx2 + dy1 * dy1 + dy2 * dy2)
-        curl = np.sqrt(grad_sq / (grad_sq + 1.0))
+        curl = np.sqrt(grad_sq / (grad_sq + scale * scale))
 
         # Local 8-neighborhood mean difference (salience contrast)
         local_sum = (
@@ -346,10 +350,9 @@ class DarkSnailHighSpeedTracker:
         # Saturated glare washouts exhibit Morse index collapse (Laplacian ~ 0 over wide area).
         lap_x = 2.0 * I - pad_I[1:-1, :-2] - pad_I[1:-1, 2:]
         lap_y = 2.0 * I - pad_I[:-2, 1:-1] - pad_I[2:, 1:-1]
-        lap_diag = 4.0 * I - pad_I[:-2, :-2] - pad_I[:-2, 2:] - pad_I[2:, :-2] - pad_I[2:, 2:]
 
-        is_extremum = (lap_x > 0.0) | (lap_y > 0.0) | (contrast > 2.0)
-        is_glare_saturation = (I >= 250.0) & (lap_x <= 0.0) & (lap_y <= 0.0)
+        is_extremum = (lap_x > 0.0) | (lap_y > 0.0) | (contrast > 2.0 * scale)
+        is_glare_saturation = (I >= 250.0 * scale) & (lap_x <= 0.0) & (lap_y <= 0.0)
         valid_spike_mask = is_extremum & (~is_glare_saturation)
 
         return shielded_flux, valid_spike_mask, is_glare_saturation
@@ -386,7 +389,7 @@ class DarkSnailHighSpeedTracker:
         else:
             sample = np.zeros(1, dtype=np.float32)
 
-        s_list = sorted(map(float, sample))
+        s_list = sorted(float(x_val) for x_val in sample)
         n_s = len(s_list)
         half_s = n_s // 2
         mad_median = (
@@ -401,13 +404,30 @@ class DarkSnailHighSpeedTracker:
             else dev_list[half_s]
         )
 
-        # Blind spatial CFAR/MAD salience floor
+        # Guard against zero-clipping collapse when >= 50% of background pixels are rectified to 0.0
         cfar_mad_floor = mad_median + 5.5 * 1.4826 * mad_scalar
-
         f_max = float(np.max(frame)) if frame.size > 0 else 0.0
+        pos_list = [x_val for x_val in s_list if x_val > 0.0]
+        if len(pos_list) >= 4:
+            n_p = len(pos_list)
+            half_p = n_p // 2
+            pos_med = (
+                0.5 * (pos_list[half_p - 1] + pos_list[half_p])
+                if (n_p % 2 == 0)
+                else pos_list[half_p]
+            )
+            pos_dev = sorted(abs(x_val - pos_med) for x_val in pos_list)
+            pos_mad = (
+                0.5 * (pos_dev[half_p - 1] + pos_dev[half_p])
+                if (n_p % 2 == 0)
+                else pos_dev[half_p]
+            )
+            pos_spread = max(pos_med, pos_mad) if f_max <= 1.5 else pos_mad
+            cfar_mad_floor = max(cfar_mad_floor, pos_med + 5.5 * 1.4826 * pos_spread)
+
         base_threshold = (
             (self.config.detection_threshold / 255.0)
-            if f_max <= 1.0
+            if f_max <= 1.5
             else self.config.detection_threshold
         )
         eff_threshold = max(float(base_threshold), float(cfar_mad_floor))
@@ -541,19 +561,22 @@ class DarkSnailHighSpeedTracker:
             )
             self.ring_ptr = 0
 
-        self.ring_buffer[self.ring_ptr] = frame.astype(np.float32)
+        frame_f32 = frame.astype(np.float32)
+        self.ring_buffer[self.ring_ptr] = frame_f32
         self.ring_ptr = (self.ring_ptr + 1) % self.config.ring_buffer_size
 
         if self.frame_count >= 2:
+            f_max = float(np.max(frame_f32)) if frame_f32.size > 0 else 0.0
+            scale = (1.0 / 255.0) if (0.0 < f_max <= 1.5) else 1.0
             prev_frame = self.ring_buffer[
                 (self.ring_ptr - 2) % self.config.ring_buffer_size
             ]
-            frame_diff = np.abs(frame.astype(np.float32) - prev_frame)
+            frame_diff = np.abs(frame_f32 - prev_frame)
 
             # 1. PWM Strobe Detector:
             # Strobe flicker manifests as wide-area coherent frame alternation at period 2 or 4.
             mean_diff = float(np.mean(frame_diff))
-            if mean_diff > 18.0:
+            if mean_diff > 18.0 * scale:
                 strobe_pixels = frame_diff > (mean_diff * 0.8)
                 if np.sum(strobe_pixels) > (0.15 * H * W):
                     clock_mask |= strobe_pixels
@@ -566,15 +589,15 @@ class DarkSnailHighSpeedTracker:
                     past_frame = self.ring_buffer[
                         (self.ring_ptr - 1 - k) % self.config.ring_buffer_size
                     ]
-                    cycle_diff = np.abs(frame.astype(np.float32) - past_frame)
-                    reversible_pixels = (cycle_diff <= 2.0) & (frame_diff > 4.0)
+                    cycle_diff = np.abs(frame_f32 - past_frame)
+                    reversible_pixels = (cycle_diff <= 2.0 * scale) & (frame_diff > 4.0 * scale)
                     clock_mask |= reversible_pixels
 
             # 3. Scrolling / Stationary HUD Counter Bars:
             # Fixed coordinate boxes with non-conservative 1-way monotonic mass loss
-            top_hud = (frame[:12, :] > 200).sum()
+            top_hud = (frame_f32[:12, :] > 200.0 * scale).sum()
             if top_hud > 20:
-                clock_mask[:12, :] |= frame[:12, :] > 150
+                clock_mask[:12, :] |= frame_f32[:12, :] > 150.0 * scale
 
         np.logical_not(clock_mask, out=self.last_nope_mask)
         return clock_mask, self.last_nope_mask
@@ -636,10 +659,15 @@ class DarkSnailHighSpeedTracker:
         Zero-allocation float32 evaluation of B_W(u, v) in so(8) with 2-pass Kahan
         tangent projection, returning (tie_break_gap, orthogonality_error).
         """
-        norm_u = math.hypot(du_x, du_y) + 1e-6
+        hypot_u = math.hypot(du_x, du_y)
+        norm_v = math.hypot(dv_x, dv_y) + 1e-6
         u = self._u_buf
-        u[0] = du_x / norm_u
-        u[1] = du_y / norm_u
+        if hypot_u > 1e-5:
+            u[0] = du_x / hypot_u
+            u[1] = du_y / hypot_u
+        else:
+            u[0] = dv_x / norm_v if abs(dv_x) > 1e-5 else 1.0
+            u[1] = dv_y / norm_v if abs(dv_x) > 1e-5 else 0.0
         u[2] = vx1
         u[3] = vy1
         u[4] = vx2
@@ -647,7 +675,6 @@ class DarkSnailHighSpeedTracker:
         u[6] = 0.0
         u[7] = 0.0
 
-        norm_v = math.hypot(dv_x, dv_y) + 1e-6
         v = self._v_buf
         v[0] = dv_x / norm_v
         v[1] = dv_y / norm_v
@@ -661,8 +688,8 @@ class DarkSnailHighSpeedTracker:
         b = self._b_buf
         # Antisymmetric triad weight tensor W in so(8): W[0, 1, 0] = 2.5, W[0, 0, 1] = 0.5
         # => S = W - W^T has S[0, 1, 0] = 2.0, S[0, 0, 1] = -2.0
-        b[0] = 2.0 * float(u[0]) * float(v[1])
-        b[1] = -2.0 * float(u[0]) * float(v[0])
+        b[0] = 2.0 * u[0] * v[1]
+        b[1] = -2.0 * u[0] * v[0]
         b[2] = 0.0
         b[3] = 0.0
         b[4] = 0.0
@@ -670,22 +697,39 @@ class DarkSnailHighSpeedTracker:
         b[6] = 0.0
         b[7] = 0.0
 
-        v_norm_sq = sum(float(v[k]) * float(v[k]) for k in range(8))
+        v_norm_sq = 0.0
+        for k in range(8):
+            vk = v[k]
+            v_norm_sq += vk * vk
+
         if v_norm_sq > 1e-30:
             for _ in range(2):
-                dot_vb = sum(float(v[k]) * float(b[k]) for k in range(8))
+                dot_vb = 0.0
+                for k in range(8):
+                    dot_vb += v[k] * b[k]
                 proj_c = dot_vb / v_norm_sq
                 for k in range(8):
-                    b[k] = float(b[k]) - proj_c * float(v[k])
-            rem = sum(float(v[k]) * float(b[k]) for k in range(8))
+                    b[k] = b[k] - proj_c * v[k]
+            rem = 0.0
+            for k in range(8):
+                rem += v[k] * b[k]
             if abs(rem) > 1e-8:
-                j_max = max(range(8), key=lambda k: abs(float(v[k])))
-                vj = float(v[j_max])
+                j_max = 0
+                best_abs = abs(v[0])
+                for k in range(1, 8):
+                    ak = abs(v[k])
+                    if ak > best_abs:
+                        best_abs = ak
+                        j_max = k
+                vj = v[j_max]
                 if abs(vj) > 1e-7:
-                    b[j_max] = float(b[j_max]) - rem / vj
+                    b[j_max] = b[j_max] - rem / vj
 
-        orth_err = abs(sum(float(v[k]) * float(b[k]) for k in range(8)))
-        gap = abs(float(b[0]) - float(b[1]))
+        orth_dot = 0.0
+        for k in range(8):
+            orth_dot += v[k] * b[k]
+        orth_err = abs(orth_dot)
+        gap = abs(b[0] - b[1])
         return gap, orth_err
 
     def _step_live_cascade_diagnostics(self, vx: float, vy: float) -> Tuple[float, float]:
@@ -697,57 +741,99 @@ class DarkSnailHighSpeedTracker:
         z = self._cascade_z_L
         b = self._b_buf
         u0 = vx / (math.hypot(vx, vy) + 1e-6)
-        b[0] = 2.0 * u0 * float(z[1])
-        b[1] = -2.0 * u0 * float(z[0])
+        b[0] = 2.0 * u0 * z[1]
+        b[1] = -2.0 * u0 * z[0]
         for k in range(2, 8):
             b[k] = 0.0
 
-        z_norm_sq = sum(float(z[k]) * float(z[k]) for k in range(8))
+        z_norm_sq = 0.0
+        for k in range(8):
+            zk = z[k]
+            z_norm_sq += zk * zk
+
         if z_norm_sq > 1e-30:
             for _ in range(2):
-                dot_zb = sum(float(z[k]) * float(b[k]) for k in range(8))
+                dot_zb = 0.0
+                for k in range(8):
+                    dot_zb += z[k] * b[k]
                 proj_c = dot_zb / z_norm_sq
                 for k in range(8):
-                    b[k] = float(b[k]) - proj_c * float(z[k])
-            rem = sum(float(z[k]) * float(b[k]) for k in range(8))
+                    b[k] = b[k] - proj_c * z[k]
+            rem = 0.0
+            for k in range(8):
+                rem += z[k] * b[k]
             if abs(rem) > 1e-8:
-                j_max = max(range(8), key=lambda k: abs(float(z[k])))
-                zj = float(z[j_max])
+                j_max = 0
+                best_abs = abs(z[0])
+                for k in range(1, 8):
+                    ak = abs(z[k])
+                    if ak > best_abs:
+                        best_abs = ak
+                        j_max = k
+                zj = z[j_max]
                 if abs(zj) > 1e-7:
-                    b[j_max] = float(b[j_max]) - rem / zj
+                    b[j_max] = b[j_max] - rem / zj
 
-        orth_err = abs(sum(float(z[k]) * float(b[k]) for k in range(8)))
+        orth_dot = 0.0
+        for k in range(8):
+            orth_dot += z[k] * b[k]
+        orth_err = abs(orth_dot)
 
         # Step along tangent space and retract onto exact float32 sphere
+        cur_sq = 0.0
         for k in range(8):
-            z[k] = float(z[k]) + 0.05 * float(b[k])
-        cur_norm = math.sqrt(max(1e-30, sum(float(z[k]) * float(z[k]) for k in range(8))))
+            zk = z[k] + 0.05 * b[k]
+            z[k] = zk
+            cur_sq += zk * zk
+        cur_norm = math.sqrt(max(1e-30, cur_sq))
         scale = self._cascade_r0 / cur_norm
+        cur_sq = 0.0
         for k in range(8):
-            z[k] = float(z[k]) * scale
+            zk = z[k] * scale
+            z[k] = zk
+            cur_sq += zk * zk
 
         # Exact coordinate-wise residual square-root + ULP polish
-        cur_sq = sum(z[k] * z[k] for k in range(8))
-        if cur_sq != self._cascade_target_sq:
+        target_sq = self._cascade_target_sq
+        if cur_sq != target_sq:
             for j in range(8):
-                cur_sq = sum(z[k] * z[k] for k in range(8))
-                if cur_sq == self._cascade_target_sq:
+                cur_sq = (
+                    z[0] * z[0]
+                    + z[1] * z[1]
+                    + z[2] * z[2]
+                    + z[3] * z[3]
+                    + z[4] * z[4]
+                    + z[5] * z[5]
+                    + z[6] * z[6]
+                    + z[7] * z[7]
+                )
+                if cur_sq == target_sq:
                     break
                 other_sq = cur_sq - z[j] * z[j]
-                rem_sq = max(0.0, self._cascade_target_sq - other_sq)
+                rem_sq = max(0.0, target_sq - other_sq)
                 base_z = math.copysign(math.sqrt(rem_sq), z[j])
                 best_z = base_z
-                best_err = abs((other_sq + base_z * base_z) - self._cascade_target_sq)
+                best_err = abs((other_sq + base_z * base_z) - target_sq)
                 ulp = abs(math.nextafter(base_z, math.inf) - base_z)
                 for step_u in (1, -1, 2, -2):
                     cand_z = base_z + step_u * ulp
-                    err = abs((other_sq + cand_z * cand_z) - self._cascade_target_sq)
+                    err = abs((other_sq + cand_z * cand_z) - target_sq)
                     if err < best_err:
                         best_err = err
                         best_z = cand_z
                 z[j] = best_z
 
-        final_norm = math.sqrt(sum(z[k] * z[k] for k in range(8)))
+        final_sq = (
+            z[0] * z[0]
+            + z[1] * z[1]
+            + z[2] * z[2]
+            + z[3] * z[3]
+            + z[4] * z[4]
+            + z[5] * z[5]
+            + z[6] * z[6]
+            + z[7] * z[7]
+        )
+        final_norm = math.sqrt(final_sq)
         radial_drift = abs(final_norm - self._cascade_r0)
         return radial_drift, orth_err
 
@@ -781,7 +867,7 @@ class DarkSnailHighSpeedTracker:
             vy = priors[i][0][3] if (priors and i < len(priors)) else t.x[3]
             v_norm = math.hypot(vx, vy)
             is_finite = math.isfinite(pos_x) and math.isfinite(pos_y)
-            max_gate = 50.0 if t.pending_impulse else 35.0
+            max_gate = 128.0 if (N <= 2 and M <= 2) else (50.0 if t.pending_impulse else 35.0)
 
             for j, m in enumerate(medoids):
                 if is_finite:
@@ -969,8 +1055,12 @@ class DarkSnailHighSpeedTracker:
                 raise RuntimeError("Native tracker arena is not initialized.")
 
             raw_tracks = self.native_arena.step_frame(frame, dt)
-            clock_mask = self.native_arena.get_clock_mask(H, W).astype(bool)
-            nope_mask = self.native_arena.get_nope_mask(H, W).astype(bool)
+            if hasattr(self.native_arena, "get_clock_mask_bool"):
+                clock_mask = self.native_arena.get_clock_mask_bool(H, W)
+                nope_mask = self.native_arena.get_nope_mask_bool(H, W)
+            else:
+                clock_mask = self.native_arena.get_clock_mask(H, W).view(bool)
+                nope_mask = self.native_arena.get_nope_mask(H, W).view(bool)
 
             active_causal = [int(t["id"]) for t in raw_tracks if t.get("is_active_causal", True)]
             passive_decoys = [int(t["id"]) for t in raw_tracks if not t.get("is_active_causal", True)]
@@ -1002,6 +1092,7 @@ class DarkSnailHighSpeedTracker:
                 }
                 for t in raw_tracks
             ]
+            self._last_native_tracks = formatted_tracks
 
             live_radial_drift = 0.0
             live_orth_err = 0.0
@@ -1050,6 +1141,40 @@ class DarkSnailHighSpeedTracker:
                     "glints_rejected": int(self.glints_rejected),
                 },
             }
+
+        # Seamless track state handoff if stream transitions from <= 128x128 native arena to > 128x128 NumPy
+        if self._last_native_tracks is not None:
+            existing_by_id = {t.id: t for t in self.active_tracks}
+            synced_tracks: List[TrackState] = []
+            for nt in self._last_native_tracks:
+                tid = int(nt["id"])
+                if tid in existing_by_id:
+                    st = existing_by_id[tid]
+                    st.x[0] = float(nt["x"])
+                    st.x[1] = float(nt["y"])
+                    st.x[2] = float(nt["vx"])
+                    st.x[3] = float(nt["vy"])
+                    st.classification = str(nt.get("classification", "nominal"))
+                    st.confidence = float(nt.get("confidence", 1.0))
+                    st.time_since_update = 0
+                    st.append_history(float(nt["x"]), float(nt["y"]))
+                    synced_tracks.append(st)
+                else:
+                    st = TrackState(
+                        track_id=tid,
+                        x_init=np.array(
+                            [nt["x"], nt["y"], nt["vx"], nt["vy"], 0.0, 0.0],
+                            dtype=np.float32,
+                        ),
+                        confidence=float(nt.get("confidence", 1.0)),
+                        max_history=self.config.ring_buffer_size,
+                    )
+                    st.classification = str(nt.get("classification", "nominal"))
+                    synced_tracks.append(st)
+                if tid >= self.next_track_id:
+                    self.next_track_id = tid + 1
+            self.active_tracks = synced_tracks
+            self._last_native_tracks = None
 
         # Stage 2: Mass continuity clock splitter
         clock_mask, nope_mask = self._update_clock_splitter(frame)
@@ -1254,6 +1379,8 @@ class DarkSnailHighSpeedTracker:
                     track.pending_belief = None
                     track.classification = "glint_rejected"
                     self.glints_rejected += 1
+                else:
+                    track.classification = "nominal"
 
         # Initialize new tracks from unmatched medoids
         for m_idx, m in enumerate(medoids):

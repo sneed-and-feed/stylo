@@ -1656,14 +1656,23 @@ class TrackerArena {
     }
 
     // Cascade Registers in so(8) (unit vector on S^7) & pre-allocated scratch buffers
-    this.cascadeRegisters = new Float32Array([0.75, 0.5, -0.35, 0.2, -0.1, 0.08, -0.05, 0.04]);
+    this.cascadeInitRegisters = new Float32Array([0.75, 0.5, -0.35, 0.2, -0.1, 0.08, -0.05, 0.04]);
     let initNorm = 0.0;
-    for (let i = 0; i < 8; i++) initNorm += this.cascadeRegisters[i] * this.cascadeRegisters[i];
+    for (let i = 0; i < 8; i++) initNorm += this.cascadeInitRegisters[i] * this.cascadeInitRegisters[i];
     initNorm = Math.sqrt(initNorm);
-    for (let i = 0; i < 8; i++) this.cascadeRegisters[i] = Math.fround(this.cascadeRegisters[i] / initNorm);
+    for (let i = 0; i < 8; i++) this.cascadeInitRegisters[i] = Math.fround(this.cascadeInitRegisters[i] / initNorm);
+    let initSqF32 = 0.0;
+    for (let i = 0; i < 8; i++) {
+      initSqF32 = Math.fround(initSqF32 + Math.fround(this.cascadeInitRegisters[i] * this.cascadeInitRegisters[i]));
+    }
+    this.cascadeTargetSq = initSqF32;
+    this.cascadeR0 = Math.fround(Math.sqrt(initSqF32));
+    this.cascadeRegisters = new Float32Array(this.cascadeInitRegisters);
     this.cascadeZHTemp = new Float32Array([1.0, 0.25, -0.25, 0.125, 0.0, 0.0, 0.0, 0.0]);
     this.cascadeVTemp = new Float32Array(8);
     this.cascadeVDotTemp = new Float32Array(8);
+    this.ulpBufF32 = new Float32Array(1);
+    this.ulpBufI32 = new Int32Array(this.ulpBufF32.buffer);
 
     // Tracking State
     this.tracks = [];       // DarkSnail Tracks
@@ -1674,6 +1683,21 @@ class TrackerArena {
     this.radialDrift = 0.0;
     this.w1Dist = 0.0;
     this.bgInitialized = false;
+  }
+
+  resetCascadeState() {
+    this.cascadeRegisters.set(this.cascadeInitRegisters);
+    this.cascadeZHTemp[0] = 1.0;
+    this.cascadeZHTemp[1] = 0.25;
+    this.cascadeZHTemp[2] = -0.25;
+    this.cascadeZHTemp[3] = 0.125;
+    this.cascadeZHTemp[4] = 0.0;
+    this.cascadeZHTemp[5] = 0.0;
+    this.cascadeZHTemp[6] = 0.0;
+    this.cascadeZHTemp[7] = 0.0;
+    this.tieBreakGap = 0.0;
+    this.orthoErr = 0.0;
+    this.radialDrift = 0.0;
   }
 
   getRingFrame(offsetBack) {
@@ -2353,14 +2377,21 @@ function evaluateTriadTieBreak(trackA, trackB) {
   return deltaLogit;
 }
 
+function sumSqF32(arr) {
+  let s = 0.0;
+  for (let i = 0; i < 8; i++) {
+    s = Math.fround(s + Math.fround(arr[i] * arr[i]));
+  }
+  return s;
+}
+
 /**
  * Unrolled SlowFastTriadCascade in so(8) across K=16 steps (Theorems 2.3 & 2.6)
  * Preserves exact radial norm drift = 0.000e+00 and tangent orthogonality <= 1e-8 in float32
  */
 function stepSlowFastCascade(zH, zL, K = 16) {
-  let targetSq = 0.0;
-  for (let i = 0; i < 8; i++) targetSq += zL[i] * zL[i];
-  let norm0 = Math.sqrt(targetSq);
+  let targetSq = arena.cascadeTargetSq || sumSqF32(zL);
+  let norm0 = arena.cascadeR0 || Math.fround(Math.sqrt(targetSq));
   if (norm0 < 1e-8) {
     zL[0] = 1.0;
     targetSq = 1.0;
@@ -2406,31 +2437,51 @@ function stepSlowFastCascade(zH, zL, K = 16) {
     maxStepOrtho = Math.max(maxStepOrtho, Math.abs(orthoStep));
 
     for (let i = 0; i < 8; i++) v[i] = Math.fround(v[i] + vDot[i]);
-    let normStep = 0.0;
-    for (let i = 0; i < 8; i++) normStep += v[i] * v[i];
-    normStep = Math.sqrt(normStep);
-    const scale = norm0 / (normStep + 1e-12);
+    const normStep = Math.sqrt(Math.max(1e-30, sumSqF32(v)));
+    const scale = norm0 / normStep;
     for (let i = 0; i < 8; i++) v[i] = Math.fround(v[i] * scale);
 
-    // Coordinate-wise residual square-root polish in float32
-    let curSq = 0.0;
-    let jMax = 0;
-    for (let i = 0; i < 8; i++) {
-      curSq += v[i] * v[i];
-      if (Math.abs(v[i]) > Math.abs(v[jMax])) jMax = i;
-    }
+    // Coordinate-wise residual square-root + IEEE-754 float32 ULP polish (matches OcclusionTriad.lean)
+    let curSq = sumSqF32(v);
     if (curSq !== targetSq) {
-      const otherSq = curSq - v[jMax] * v[jMax];
-      const remSq = Math.max(0.0, targetSq - otherSq);
-      v[jMax] = Math.fround((v[jMax] >= 0 ? 1.0 : -1.0) * Math.sqrt(remSq));
+      const f32Buf = arena.ulpBufF32;
+      const i32Buf = arena.ulpBufI32;
+      for (let j = 0; j < 8; j++) {
+        curSq = sumSqF32(v);
+        if (curSq === targetSq) break;
+        let otherSq = 0.0;
+        for (let k = 0; k < 8; k++) {
+          if (k !== j) otherSq = Math.fround(otherSq + Math.fround(v[k] * v[k]));
+        }
+        const remSq = Math.max(0.0, targetSq - otherSq);
+        const sign = v[j] >= 0.0 ? 1.0 : -1.0;
+        const baseZ = Math.fround(sign * Math.sqrt(remSq));
+        let bestZ = baseZ;
+        v[j] = baseZ;
+        let bestErr = Math.abs(sumSqF32(v) - targetSq);
+        f32Buf[0] = baseZ;
+        const baseBits = i32Buf[0];
+        for (let dUlp = -2; dUlp <= 2; dUlp++) {
+          if (dUlp === 0) continue;
+          i32Buf[0] = baseBits + dUlp;
+          const candZ = f32Buf[0];
+          if (!isFinite(candZ)) continue;
+          v[j] = candZ;
+          const err = Math.abs(sumSqF32(v) - targetSq);
+          if (err < bestErr) {
+            bestErr = err;
+            bestZ = candZ;
+          }
+        }
+        v[j] = bestZ;
+      }
     }
   }
 
-  let finalNorm = 0.0;
-  for (let i = 0; i < 8; i++) finalNorm += v[i] * v[i];
-  finalNorm = Math.sqrt(finalNorm);
+  const finalSq = sumSqF32(v);
+  const finalNorm = Math.fround(Math.sqrt(finalSq));
   arena.radialDrift = Math.abs(finalNorm - norm0);
-  arena.orthoErr = maxStepOrtho;
+  arena.orthoErr = Math.max(arena.orthoErr || 0.0, maxStepOrtho);
   arena.cascadeRegisters.set(v);
   return v;
 }
@@ -2586,7 +2637,7 @@ class ProceduralDeck {
     this.simulatedTargets = [];
     arena.tracks = [];
     arena.legacyTracks = [];
-    arena.tieBreakGap = 0.0;
+    arena.resetCascadeState();
 
     const w = CONFIG.width;
     const h = CONFIG.height;
@@ -2943,9 +2994,15 @@ function runDarkSnailTrackerStep(arena) {
   const assocRadius = isLiveStream ? 18.0 : 12.0;
 
   // Stage 3: Evaluate pairwise so(C) Skew-Symmetric Triad Tie-Breaking in collision zones
+  arena.orthoErr = 0.0;
+  const trackTriadGap = new Float32Array(activeTracks.length);
   for (let i = 0; i < activeTracks.length; i++) {
     for (let j = i + 1; j < activeTracks.length; j++) {
-      evaluateTriadTieBreak(activeTracks[i], activeTracks[j]);
+      const gap = evaluateTriadTieBreak(activeTracks[i], activeTracks[j]);
+      if (gap > 0.0) {
+        if (gap > trackTriadGap[i]) trackTriadGap[i] = gap;
+        if (gap > trackTriadGap[j]) trackTriadGap[j] = gap;
+      }
     }
   }
 
@@ -2969,6 +3026,7 @@ function runDarkSnailTrackerStep(arena) {
       else if (predY >= arena.h - 6) { predY = arena.h - 7; effVy = -tr.vy; }
     }
     const vNorm = Math.hypot(effVx, effVy);
+    const tGap = trackTriadGap[i];
 
     for (let m = 0; m < medoidCount; m++) {
       const med = arena.medoids[m];
@@ -2981,7 +3039,7 @@ function runDarkSnailTrackerStep(arena) {
       const gateLim = tr.pendingImpulse ? assocRadius * 2.5 : Math.max(assocRadius, vNorm * 2.2);
       if (dPred > gateLim) continue;
 
-      // Directional momentum alignment penalty (prevents 90/180 deg crossing swaps)
+      // Directional momentum alignment penalty & skew-symmetric triad tie-breaking modulation
       let alignPenalty = 0.0;
       const dxApp = med.x - tr.x;
       const dyApp = med.y - tr.y;
@@ -2989,6 +3047,9 @@ function runDarkSnailTrackerStep(arena) {
       if (!tr.pendingImpulse && vNorm > 0.15 && dApp > 0.35) {
         const cosTheta = (dxApp * effVx + dyApp * effVy) / (dApp * vNorm);
         alignPenalty = Math.max(0.0, 1.0 - cosTheta) * 9.5;
+        if (tGap > 0.0) {
+          alignPenalty -= 0.15 * Math.min(tGap, 2.0) * cosTheta;
+        }
       }
 
       pairs.push({ tIdx: i, mIdx: m, cost: dPred + alignPenalty });
@@ -3220,7 +3281,19 @@ function runDarkSnailTrackerStep(arena) {
     }
   }
 
-  // Update SlowFast Triad Cascade in so(8) (Theorem 2.6)
+  // Update SlowFast Triad Cascade in so(8) from live track kinematics (Theorem 2.6)
+  if (activeTracks.length > 0) {
+    const t0 = activeTracks[0];
+    arena.cascadeZHTemp[0] = Math.fround(1.0 + t0.vx * 0.15);
+    arena.cascadeZHTemp[1] = Math.fround(0.25 + t0.vy * 0.15);
+    arena.cascadeZHTemp[2] = Math.fround(-0.25 + (t0.x / arena.w) * 0.1);
+    arena.cascadeZHTemp[3] = Math.fround(0.125 + (t0.y / arena.h) * 0.1);
+    if (activeTracks.length > 1) {
+      const t1 = activeTracks[1];
+      arena.cascadeZHTemp[4] = Math.fround(t1.vx * 0.1);
+      arena.cascadeZHTemp[5] = Math.fround(t1.vy * 0.1);
+    }
+  }
   stepSlowFastCascade(arena.cascadeZHTemp, arena.cascadeRegisters, 16);
 
   // Stage 4: Decoy Factorization
@@ -4114,7 +4187,7 @@ function verifyFormalTheorems() {
     maxAntisymResidual === 0.0 &&
     tieBreakGap > 0.0 &&
     orthoErr <= 1.0e-8 &&
-    arena.radialDrift <= 1.0e-7
+    arena.radialDrift === 0.0
   );
 
   return {
@@ -4306,6 +4379,7 @@ const offscreenVideoCtx = offscreenVideoCanvas.getContext('2d', { willReadFreque
 function resetArenaForLiveStream() {
   arena.tracks = [];
   arena.legacyTracks = [];
+  arena.resetCascadeState();
   arena.currFrame.fill(0);
   arena.prevFrame.fill(0);
   arena.bgModel.fill(0);
