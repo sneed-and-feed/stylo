@@ -639,6 +639,52 @@ class TestMemoryAndPerformanceSuite:
             f"Python peak heap violation: {delta_py_mb:.3f} MB exceeds 35.0 MB hard tracemalloc ceiling!"
         )
 
+    def test_steady_state_heap_growth_and_live_diagnostics_1000_frames(self):
+        """Steady-state heap growth over 1,000 active multi-target frames is < 2048 B with bounded TrackState.history and live diagnostics."""
+        if DarkSnailHighSpeedTracker is None:
+            pytest.skip("DarkSnailHighSpeedTracker not yet imported")
+
+        import gc
+
+        frame_multi = _make_synthetic_frame(
+            h=128,
+            w=128,
+            targets=[(25.0, 25.0, 0.9), (29.5, 28.5, 0.9), (80.0, 80.0, 0.85)],
+        )
+        dt = 1.0 / 240.0
+        config = TrackerConfig(detection_threshold=20.0) if TrackerConfig is not None else None
+        tracemalloc.start()
+        try:
+            py_tracker = DarkSnailHighSpeedTracker(backend="numpy", config=config)
+
+            # Warm up 30 frames so ring buffer and active tracks reach steady state
+            last_out = None
+            for _ in range(30):
+                last_out = py_tracker.update(frame_multi, dt)
+
+            gc.collect()
+            snap_start, _ = tracemalloc.get_traced_memory()
+            for _ in range(1000):
+                last_out = py_tracker.update(frame_multi, dt)
+            gc.collect()
+            snap_end, _ = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+
+        steady_growth_bytes = max(0, snap_end - snap_start)
+        assert steady_growth_bytes < 2048, (
+            f"Steady-state heap growth {steady_growth_bytes} B >= 2048 B over 1,000 multi-target frames!"
+        )
+        for trk in py_tracker.active_tracks:
+            assert len(trk.history) <= py_tracker.config.ring_buffer_size, (
+                f"TrackState.history grew unboundedly to {len(trk.history)} > {py_tracker.config.ring_buffer_size}"
+            )
+        assert last_out is not None
+        diag = last_out["diagnostics"]
+        assert diag["radial_drift"] == 0.0
+        assert diag["max_orthogonality_error"] <= 1.0e-8
+        assert diag["tie_break_gap"] > 0.0
+
     def test_vectorized_python_throughput_fps(self):
         """Vectorized Python single-core throughput > 165 FPS (< 6.0 ms/frame) on 128x128."""
         if DarkSnailHighSpeedTracker is None:

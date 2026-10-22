@@ -1039,19 +1039,29 @@ def run_monte_carlo_sweep(
         ],
         dtype=np.float32,
     )
-    sqrt_R = np.sqrt(R_diag)
+    # Steady-state prior state covariance P_minus (diagonal 6-DOF prior uncertainty)
+    P_minus_diag = np.array([0.25, 0.25, 1.0, 1.0, 4.0, 4.0], dtype=np.float64)
+    R_base_diag = R_diag.astype(np.float64)
 
     for trial_idx in range(n_trials):
-        snr_db = snr_levels[trial_idx]
-        noise_scale = 10.0 ** (-snr_db / 40.0)
+        snr_db = float(snr_levels[trial_idx])
+        # SNR-dependent measurement noise variance inflation factor (10 dB -> ~1.316x, 20 dB -> ~1.10x)
+        snr_amplitude_ratio = 10.0 ** (-snr_db / 20.0)
+        R_snr_diag = R_base_diag * (1.0 + snr_amplitude_ratio)
 
-        # Standardized 6-DOF nominal innovations
-        raw_innovations = rng.normal(0.0, 1.0, size=(steps_per_trial, dim)).astype(np.float32)
-        raw_innovations *= noise_scale
+        # Total 6-DOF innovation covariance S = H P_minus H^T + R(SNR)
+        S_diag = P_minus_diag + R_snr_diag
+        sigma_S = np.sqrt(S_diag)
 
-        # Diagonal whitening normalization
-        whitened_innovations = (raw_innovations * sqrt_R) / (sqrt_R * noise_scale)
-        d_mah_sq = np.sum(whitened_innovations**2, axis=-1)
+        # Draw physical unwhitened 6-DOF innovations y ~ N(0, S) directly in physical units
+        physical_innovations = rng.normal(loc=0.0, scale=sigma_S, size=(steps_per_trial, dim)).astype(
+            np.float32
+        )
+
+        # Apply adaptive Kalman innovation covariance whitening S^{-1/2} y
+        inv_sqrt_S = (1.0 / sigma_S).astype(np.float32)
+        whitened_innovations = physical_innovations * inv_sqrt_S
+        d_mah_sq = np.sum(whitened_innovations * whitened_innovations, axis=-1)
 
         false_triggers += int(np.sum(d_mah_sq > threshold))
 
@@ -1088,7 +1098,7 @@ def generate_nominal_coast_stream(
     Generates nominal streaming video with per-tick moving target mutation (frame_curr - frame_prev != 0).
     Target moves with constant velocity (vx=0.5, vy=0.35 px/frame) so the innovation squared Mahalanobis
     distance D^2 remains well within the chi^2_{0.999} = 22.46 threshold, skipping Phi^{-1}(dt) step
-    re-initialization on 99.88% of epochs.
+    re-initialization on nominal coasting epochs.
     """
     rng = np.random.RandomState(seed)
     frames = np.full((num_frames, H, W), 0.1, dtype=np.float32)
@@ -1117,7 +1127,7 @@ def run_coast_vs_active_collision_breakdown(
     """
     Measures and reports:
     (a) Nominal Coast Stream FPS & Latency (us/frame) with per-tick moving target mutation
-        (where chi2_0.999 = 22.46 skips Phi^{-1}(dt) re-init on 99.88% of epochs)
+        (measuring dynamic Phi^{-1}(dt) re-initialization skip rate across epochs)
         for both Vectorized Python and Compiled Rust SIMD.
     (b) Dense 4-Way Crossing & Strobe Torture FPS & Latency (us/frame)
         (mean across full 5-scenario deck + per-scenario breakdown for Python and Rust SIMD).
@@ -1155,14 +1165,20 @@ def run_coast_vs_active_collision_breakdown(
         tr_py.update(nominal_frames[w_i], dt)
     tr_py.reset()
 
+    nominal_skip_epochs = 0
     t0_py = time.perf_counter()
     for t in range(num_nominal_frames):
-        tr_py.update(nominal_frames[t], dt)
+        out_py = tr_py.update(nominal_frames[t], dt)
+        if out_py.get("classification", "nominal") != "step_maneuver":
+            nominal_skip_epochs += 1
     elapsed_py = time.perf_counter() - t0_py
 
     fps_py = float(num_nominal_frames) / max(elapsed_py, 1e-6)
     us_py = (elapsed_py / float(num_nominal_frames)) * 1e6
     ms_py = (elapsed_py / float(num_nominal_frames)) * 1e3
+    phi_inv_skip_rate_pct = round(
+        100.0 * float(nominal_skip_epochs) / float(max(1, num_nominal_frames)), 2
+    )
 
     # 2. Compiled Rust SIMD
     if has_rust:
@@ -1171,15 +1187,22 @@ def run_coast_vs_active_collision_breakdown(
             tr_rs.update(nominal_frames[w_i], dt)
         tr_rs.reset()
 
+        rs_skip_epochs = 0
         t0_rs = time.perf_counter()
         for t in range(num_nominal_frames):
-            tr_rs.update(nominal_frames[t], dt)
+            out_rs = tr_rs.update(nominal_frames[t], dt)
+            if out_rs.get("classification", "nominal") != "step_maneuver":
+                rs_skip_epochs += 1
         elapsed_rs = time.perf_counter() - t0_rs
 
         fps_rs = float(num_nominal_frames) / max(elapsed_rs, 1e-6)
         us_rs = (elapsed_rs / float(num_nominal_frames)) * 1e6
         ms_rs = (elapsed_rs / float(num_nominal_frames)) * 1e3
         speedup_nominal = fps_rs / max(fps_py, 1e-6)
+        phi_inv_skip_rate_pct = round(
+            100.0 * float(min(nominal_skip_epochs, rs_skip_epochs)) / float(max(1, num_nominal_frames)),
+            2,
+        )
     else:
         fps_rs = 0.0
         us_rs = 0.0
@@ -1187,7 +1210,10 @@ def run_coast_vs_active_collision_breakdown(
         speedup_nominal = 1.0
 
     nominal_coast_metrics = {
-        "description": "Nominal streaming video with per-tick target mutation, chi2_0.999 = 22.46 skips Phi^{-1}(dt) re-init on 99.88% of epochs",
+        "description": (
+            f"Nominal streaming video with per-tick target mutation, chi2_0.999 = 22.46 "
+            f"skips Phi^(-1)(dt) re-init on {phi_inv_skip_rate_pct:.2f}% of epochs"
+        ),
         "frame_count": int(num_nominal_frames),
         "resolution": f"{H}x{W}",
         "vectorized_python": {
@@ -1201,7 +1227,7 @@ def run_coast_vs_active_collision_breakdown(
             "ms_per_frame": float(ms_rs),
         },
         "speedup_factor": float(speedup_nominal),
-        "phi_inv_skip_rate_pct": 99.88,
+        "phi_inv_skip_rate_pct": float(phi_inv_skip_rate_pct),
         "status": "PASS",
     }
 

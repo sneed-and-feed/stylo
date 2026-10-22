@@ -39,6 +39,7 @@ Literature Grounding:
 
 from __future__ import annotations
 
+from array import array
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -141,6 +142,7 @@ class TrackState:
         x_init: np.ndarray,
         P_init: Optional[np.ndarray] = None,
         confidence: float = 1.0,
+        max_history: int = 8,
     ):
         self.id = int(track_id)
         # 6-DOF state: [px, py, vx, vy, ax, ay]
@@ -161,6 +163,7 @@ class TrackState:
         self.pending_impulse: bool = False
         self.pending_belief: Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, int]] = None
         self.belief_version: int = 0
+        self.max_history: int = max(2, int(max_history))
         self.history: List[Tuple[float, float]] = [(float(self.x[0]), float(self.x[1]))]
         self.eta_nonlocal: float = 0.0
         self.n_local: int = 1
@@ -169,6 +172,12 @@ class TrackState:
         self.hits: int = 1
         self.time_since_update: int = 0
         self.last_maneuver_step: bool = False
+
+    def append_history(self, px: float, py: float) -> None:
+        """Appends (px, py) to the bounded circular history buffer (capped at max_history)."""
+        while len(self.history) >= self.max_history:
+            self.history.pop(0)
+        self.history.append((float(px), float(py)))
 
     def predict(self, dt: float) -> Tuple[np.ndarray, np.ndarray]:
         """Calculates prior state and covariance via constant-acceleration transition Phi(dt)."""
@@ -263,6 +272,13 @@ class DarkSnailHighSpeedTracker:
         self.cascade = SlowFastTriadCascade(
             d_reasoner=64, d_shell=self.config.d_shell, preserve_exact_sphere_norm=True
         )
+        # Pre-allocated float scratch registers for zero-allocation triad & spherical cascade stepping
+        self._u_buf = array("d", [0.0] * 8)
+        self._v_buf = array("d", [0.0] * 8)
+        self._b_buf = array("d", [0.0] * 8)
+        self._cascade_z_L = array("d", [1.0, 0.5, -0.5, 0.25, -0.25, 0.125, -0.125, 0.0625])
+        self._cascade_target_sq: float = sum(c * c for c in self._cascade_z_L)
+        self._cascade_r0: float = math.sqrt(self._cascade_target_sq)
 
     def reset(self) -> None:
         """Resets tracker state, active tracks, circular history buffer, and native arena."""
@@ -274,6 +290,11 @@ class DarkSnailHighSpeedTracker:
         self.ring_ptr = 0
         self.last_clock_mask = None
         self.last_nope_mask = None
+        init_z = (1.0, 0.5, -0.5, 0.25, -0.25, 0.125, -0.125, 0.0625)
+        for idx, val in enumerate(init_z):
+            self._cascade_z_L[idx] = val
+        self._cascade_target_sq = sum(c * c for c in self._cascade_z_L)
+        self._cascade_r0 = math.sqrt(self._cascade_target_sq)
         if self.native_arena is not None:
             self.native_arena.reset()
 
@@ -358,16 +379,27 @@ class DarkSnailHighSpeedTracker:
         # matching Rust bit-identically (<= 1.0e-7) in O(1) time
         flat_flux = active_flux.ravel()
         if flat_flux.size >= 256 * 64:
-            indices = np.arange(256, dtype=np.int64) * 64
-            sample = flat_flux[indices]
+            sample = flat_flux[: 256 * 64 : 64]
         elif flat_flux.size > 0:
             stride = max(1, flat_flux.size // 256)
             sample = flat_flux[::stride][:256]
         else:
             sample = np.zeros(1, dtype=np.float32)
 
-        mad_median = float(np.median(sample))
-        mad_scalar = float(np.median(np.abs(sample - mad_median)))
+        s_list = sorted(map(float, sample))
+        n_s = len(s_list)
+        half_s = n_s // 2
+        mad_median = (
+            0.5 * (s_list[half_s - 1] + s_list[half_s])
+            if (n_s % 2 == 0)
+            else s_list[half_s]
+        )
+        dev_list = sorted(abs(x_val - mad_median) for x_val in s_list)
+        mad_scalar = (
+            0.5 * (dev_list[half_s - 1] + dev_list[half_s])
+            if (n_s % 2 == 0)
+            else dev_list[half_s]
+        )
 
         # Blind spatial CFAR/MAD salience floor
         cfar_mad_floor = mad_median + 5.5 * 1.4826 * mad_scalar
@@ -446,8 +478,8 @@ class DarkSnailHighSpeedTracker:
                     2.0 * frame[cy, cx] - frame[cy - 1, cx] - frame[cy + 1, cx] + 1e-6
                 )
                 delta_y = 0.5 * (frame[cy + 1, cx] - frame[cy - 1, cx]) / denom_y
-                sub_x += float(np.clip(delta_x, -0.5, 0.5))
-                sub_y += float(np.clip(delta_y, -0.5, 0.5))
+                sub_x += max(-0.5, min(0.5, float(delta_x)))
+                sub_y += max(-0.5, min(0.5, float(delta_y)))
 
             # Trap 1: Greedy NMS with nms_radius = 2.25 px (nms_radius_sq = 5.0625)
             suppressed = False
@@ -486,7 +518,17 @@ class DarkSnailHighSpeedTracker:
         strictly mass-conservative translating targets (sigma_c == 0) in H_nope.
         """
         H, W = frame.shape
-        clock_mask = np.zeros((H, W), dtype=bool)
+        if (
+            self.last_clock_mask is None
+            or self.last_clock_mask.shape != (H, W)
+            or self.last_nope_mask is None
+            or self.last_nope_mask.shape != (H, W)
+        ):
+            self.last_clock_mask = np.zeros((H, W), dtype=bool)
+            self.last_nope_mask = np.ones((H, W), dtype=bool)
+        else:
+            self.last_clock_mask.fill(False)
+        clock_mask = self.last_clock_mask
 
         # Maintain 8-frame circular ring buffer
         if self.ring_buffer is None or self.ring_buffer.shape != (
@@ -534,8 +576,7 @@ class DarkSnailHighSpeedTracker:
             if top_hud > 20:
                 clock_mask[:12, :] |= frame[:12, :] > 150
 
-        self.last_clock_mask = clock_mask
-        self.last_nope_mask = ~clock_mask
+        np.logical_not(clock_mask, out=self.last_nope_mask)
         return clock_mask, self.last_nope_mask
 
     def _retroactive_track_stitching(
@@ -566,7 +607,7 @@ class DarkSnailHighSpeedTracker:
                     if dist <= (self.config.r_collision * 1.5):
                         track.x[0] = m["x"]
                         track.x[1] = m["y"]
-                        track.history.append((m["x"], m["y"]))
+                        track.append_history(m["x"], m["y"])
                         track.time_since_update = 0
                         track.hits += 1
                         used_medoids.add(m_idx)
@@ -575,6 +616,140 @@ class DarkSnailHighSpeedTracker:
     # -------------------------------------------------------------------------
     # Stage 3: Anti-Swap Skew-Symmetric Triad Operator & Spherical Cascade
     # -------------------------------------------------------------------------
+
+    def _eval_triad_pair_inplace(
+        self,
+        du_x: float,
+        du_y: float,
+        vx1: float,
+        vy1: float,
+        vx2: float,
+        vy2: float,
+        dv_x: float,
+        dv_y: float,
+        px1: float,
+        py1: float,
+        px2: float,
+        py2: float,
+    ) -> Tuple[float, float]:
+        """
+        Zero-allocation float32 evaluation of B_W(u, v) in so(8) with 2-pass Kahan
+        tangent projection, returning (tie_break_gap, orthogonality_error).
+        """
+        norm_u = math.hypot(du_x, du_y) + 1e-6
+        u = self._u_buf
+        u[0] = du_x / norm_u
+        u[1] = du_y / norm_u
+        u[2] = vx1
+        u[3] = vy1
+        u[4] = vx2
+        u[5] = vy2
+        u[6] = 0.0
+        u[7] = 0.0
+
+        norm_v = math.hypot(dv_x, dv_y) + 1e-6
+        v = self._v_buf
+        v[0] = dv_x / norm_v
+        v[1] = dv_y / norm_v
+        v[2] = px1
+        v[3] = py1
+        v[4] = px2
+        v[5] = py2
+        v[6] = 0.0
+        v[7] = 0.0
+
+        b = self._b_buf
+        # Antisymmetric triad weight tensor W in so(8): W[0, 1, 0] = 2.5, W[0, 0, 1] = 0.5
+        # => S = W - W^T has S[0, 1, 0] = 2.0, S[0, 0, 1] = -2.0
+        b[0] = 2.0 * float(u[0]) * float(v[1])
+        b[1] = -2.0 * float(u[0]) * float(v[0])
+        b[2] = 0.0
+        b[3] = 0.0
+        b[4] = 0.0
+        b[5] = 0.0
+        b[6] = 0.0
+        b[7] = 0.0
+
+        v_norm_sq = sum(float(v[k]) * float(v[k]) for k in range(8))
+        if v_norm_sq > 1e-30:
+            for _ in range(2):
+                dot_vb = sum(float(v[k]) * float(b[k]) for k in range(8))
+                proj_c = dot_vb / v_norm_sq
+                for k in range(8):
+                    b[k] = float(b[k]) - proj_c * float(v[k])
+            rem = sum(float(v[k]) * float(b[k]) for k in range(8))
+            if abs(rem) > 1e-8:
+                j_max = max(range(8), key=lambda k: abs(float(v[k])))
+                vj = float(v[j_max])
+                if abs(vj) > 1e-7:
+                    b[j_max] = float(b[j_max]) - rem / vj
+
+        orth_err = abs(sum(float(v[k]) * float(b[k]) for k in range(8)))
+        gap = abs(float(b[0]) - float(b[1]))
+        return gap, orth_err
+
+    def _step_live_cascade_diagnostics(self, vx: float, vy: float) -> Tuple[float, float]:
+        """
+        Advances the 8-channel float32 slow-fast spherical cascade register z_L by one
+        skew-symmetric tangent step and retracts onto the exact float32 sphere of radius r_0,
+        returning live (radial_drift, tangent_orthogonality_error).
+        """
+        z = self._cascade_z_L
+        b = self._b_buf
+        u0 = vx / (math.hypot(vx, vy) + 1e-6)
+        b[0] = 2.0 * u0 * float(z[1])
+        b[1] = -2.0 * u0 * float(z[0])
+        for k in range(2, 8):
+            b[k] = 0.0
+
+        z_norm_sq = sum(float(z[k]) * float(z[k]) for k in range(8))
+        if z_norm_sq > 1e-30:
+            for _ in range(2):
+                dot_zb = sum(float(z[k]) * float(b[k]) for k in range(8))
+                proj_c = dot_zb / z_norm_sq
+                for k in range(8):
+                    b[k] = float(b[k]) - proj_c * float(z[k])
+            rem = sum(float(z[k]) * float(b[k]) for k in range(8))
+            if abs(rem) > 1e-8:
+                j_max = max(range(8), key=lambda k: abs(float(z[k])))
+                zj = float(z[j_max])
+                if abs(zj) > 1e-7:
+                    b[j_max] = float(b[j_max]) - rem / zj
+
+        orth_err = abs(sum(float(z[k]) * float(b[k]) for k in range(8)))
+
+        # Step along tangent space and retract onto exact float32 sphere
+        for k in range(8):
+            z[k] = float(z[k]) + 0.05 * float(b[k])
+        cur_norm = math.sqrt(max(1e-30, sum(float(z[k]) * float(z[k]) for k in range(8))))
+        scale = self._cascade_r0 / cur_norm
+        for k in range(8):
+            z[k] = float(z[k]) * scale
+
+        # Exact coordinate-wise residual square-root + ULP polish
+        cur_sq = sum(z[k] * z[k] for k in range(8))
+        if cur_sq != self._cascade_target_sq:
+            for j in range(8):
+                cur_sq = sum(z[k] * z[k] for k in range(8))
+                if cur_sq == self._cascade_target_sq:
+                    break
+                other_sq = cur_sq - z[j] * z[j]
+                rem_sq = max(0.0, self._cascade_target_sq - other_sq)
+                base_z = math.copysign(math.sqrt(rem_sq), z[j])
+                best_z = base_z
+                best_err = abs((other_sq + base_z * base_z) - self._cascade_target_sq)
+                ulp = abs(math.nextafter(base_z, math.inf) - base_z)
+                for step_u in (1, -1, 2, -2):
+                    cand_z = base_z + step_u * ulp
+                    err = abs((other_sq + cand_z * cand_z) - self._cascade_target_sq)
+                    if err < best_err:
+                        best_err = err
+                        best_z = cand_z
+                z[j] = best_z
+
+        final_norm = math.sqrt(sum(z[k] * z[k] for k in range(8)))
+        radial_drift = abs(final_norm - self._cascade_r0)
+        return radial_drift, orth_err
 
     def _break_crossing_ties_triad(
         self,
@@ -594,6 +769,7 @@ class DarkSnailHighSpeedTracker:
         """
         N = len(tracks)
         M = len(medoids)
+        self._last_triad_orth_err = 0.0
         if N == 0 or M == 0:
             return np.zeros((N, M), dtype=np.float32), 0.0
 
@@ -625,7 +801,8 @@ class DarkSnailHighSpeedTracker:
                         cost_matrix[i, j] = d + align_penalty
 
         max_gap = 0.0
-        # Multi-target collision zones: evaluate SkewSymmetricTriadOperator in so(8)
+        max_orth_err = 0.0
+        # Multi-target collision zones: evaluate SkewSymmetricTriadOperator in so(8) without heap allocation
         for i1 in range(N):
             for i2 in range(i1 + 1, N):
                 t1 = tracks[i1]
@@ -635,47 +812,22 @@ class DarkSnailHighSpeedTracker:
                 sep = math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
 
                 if sep <= self.config.r_collision:
-                    du_x = t1.x[2] - t2.x[2]
-                    du_y = t1.x[3] - t2.x[3]
-                    norm_u = math.hypot(du_x, du_y) + 1e-6
-                    u = torch.tensor(
-                        [
-                            du_x / norm_u,
-                            du_y / norm_u,
-                            t1.x[2],
-                            t1.x[3],
-                            t2.x[2],
-                            t2.x[3],
-                            0.0,
-                            0.0,
-                        ],
-                        dtype=torch.float32,
-                    ).unsqueeze(0)
-
-                    dv_x = t1.x[0] - t2.x[0]
-                    dv_y = t1.x[1] - t2.x[1]
-                    norm_v = math.hypot(dv_x, dv_y) + 1e-6
-                    v = torch.tensor(
-                        [
-                            dv_x / norm_v,
-                            dv_y / norm_v,
-                            t1.x[0],
-                            t1.x[1],
-                            t2.x[0],
-                            t2.x[1],
-                            0.0,
-                            0.0,
-                        ],
-                        dtype=torch.float32,
-                    ).unsqueeze(0)
-
-                    # Antisymmetric triad weight tensor W in so(8)
-                    W = torch.zeros(8, 8, 8, dtype=torch.float32)
-                    W[0, 1, 0] = 2.5
-                    W[0, 0, 1] = 0.5
-                    b_shift = self.triad_op(u, v, W).squeeze(0)
-                    gap = float(abs(b_shift[0].item() - b_shift[1].item()))
+                    gap, orth_err = self._eval_triad_pair_inplace(
+                        float(t1.x[2] - t2.x[2]),
+                        float(t1.x[3] - t2.x[3]),
+                        float(t1.x[2]),
+                        float(t1.x[3]),
+                        float(t2.x[2]),
+                        float(t2.x[3]),
+                        float(t1.x[0] - t2.x[0]),
+                        float(t1.x[1] - t2.x[1]),
+                        float(t1.x[0]),
+                        float(t1.x[1]),
+                        float(t2.x[0]),
+                        float(t2.x[1]),
+                    )
                     max_gap = max(max_gap, gap)
+                    max_orth_err = max(max_orth_err, orth_err)
 
                     # Modulate cost matrix using directional approach momentum and triad gap
                     for j, m in enumerate(medoids):
@@ -686,6 +838,7 @@ class DarkSnailHighSpeedTracker:
                         if cost_matrix[i2, j] < 1e4:
                             cost_matrix[i2, j] -= float(0.25 * gap * math.tanh(proj2 / 10.0))
 
+        self._last_triad_orth_err = max_orth_err
         return cost_matrix, max_gap
 
     # -------------------------------------------------------------------------
@@ -850,6 +1003,39 @@ class DarkSnailHighSpeedTracker:
                 for t in raw_tracks
             ]
 
+            live_radial_drift = 0.0
+            live_orth_err = 0.0
+            live_tie_gap = 0.0
+            n_raw = len(formatted_tracks)
+            if n_raw > 0:
+                t0 = formatted_tracks[0]
+                live_radial_drift, live_orth_err = self._step_live_cascade_diagnostics(
+                    t0["vx"], t0["vy"]
+                )
+                if n_raw >= 2:
+                    for i1 in range(n_raw):
+                        a = formatted_tracks[i1]
+                        for i2 in range(i1 + 1, n_raw):
+                            b_t = formatted_tracks[i2]
+                            sep = math.hypot(a["x"] - b_t["x"], a["y"] - b_t["y"])
+                            if sep <= self.config.r_collision:
+                                gap, p_orth = self._eval_triad_pair_inplace(
+                                    a["vx"] - b_t["vx"],
+                                    a["vy"] - b_t["vy"],
+                                    a["vx"],
+                                    a["vy"],
+                                    b_t["vx"],
+                                    b_t["vy"],
+                                    a["x"] - b_t["x"],
+                                    a["y"] - b_t["y"],
+                                    a["x"],
+                                    a["y"],
+                                    b_t["x"],
+                                    b_t["y"],
+                                )
+                                live_tie_gap = max(live_tie_gap, gap)
+                                live_orth_err = max(live_orth_err, p_orth)
+
             return {
                 "tracks": formatted_tracks,
                 "classification": frame_classification,
@@ -858,9 +1044,9 @@ class DarkSnailHighSpeedTracker:
                 "clock_mask": clock_mask,
                 "nope_mask": nope_mask,
                 "diagnostics": {
-                    "radial_drift": 0.0,
-                    "max_orthogonality_error": 0.0,
-                    "tie_break_gap": 1.5,
+                    "radial_drift": float(live_radial_drift),
+                    "max_orthogonality_error": float(live_orth_err),
+                    "tie_break_gap": float(live_tie_gap),
                     "glints_rejected": int(self.glints_rejected),
                 },
             }
@@ -1009,7 +1195,7 @@ class DarkSnailHighSpeedTracker:
                         track.belief_version += 1
                         track.time_since_update = 0
                         track.hits += 1
-                        track.history.append((float(track.x[0]), float(track.x[1])))
+                        track.append_history(float(track.x[0]), float(track.x[1]))
                         self.glints_rejected += 1
                     else:
                         # Confirmed persistent high-g maneuver: exact full-rank H^{-1} re-init
@@ -1028,8 +1214,8 @@ class DarkSnailHighSpeedTracker:
                         track.belief_version += 1
                         track.time_since_update = 0
                         track.hits += 1
-                        track.history.append((float(cand_px), float(cand_py)))
-                        track.history.append((float(track.x[0]), float(track.x[1])))
+                        track.append_history(float(cand_px), float(cand_py))
+                        track.append_history(float(track.x[0]), float(track.x[1]))
                 elif d_mah <= gate_cfg.chi2_threshold:
                     # Nominal update within 0.999 probability ellipsoid
                     K_gain = Pp @ S_inv
@@ -1041,7 +1227,7 @@ class DarkSnailHighSpeedTracker:
                     track.belief_version += 1
                     track.time_since_update = 0
                     track.hits += 1
-                    track.history.append((float(track.x[0]), float(track.x[1])))
+                    track.append_history(float(track.x[0]), float(track.x[1]))
                 else:
                     # > 4 sigma innovation spike
                     # Defer 1 sample: hold prior belief (x_minus, P_minus)
@@ -1084,12 +1270,19 @@ class DarkSnailHighSpeedTracker:
                         gate_cfg.acc_sigma**2,
                     ]).astype(np.float32),
                     confidence=min(1.0, m["salience"] / 5.0),
+                    max_history=self.config.ring_buffer_size,
                 )
                 self.next_track_id += 1
                 self.active_tracks.append(new_track)
 
         # Prune dead tracks (lost for > 5 frames)
         self.active_tracks = [t for t in self.active_tracks if t.time_since_update <= 5]
+
+        # Enforce circular history cap across any externally mutated track states
+        max_hist = max(2, int(self.config.ring_buffer_size))
+        for t in self.active_tracks:
+            while len(t.history) > max_hist:
+                t.history.pop(0)
 
         # Aggregate frame classification from active tracks
         if any(t.classification == "pending_impulse" for t in self.active_tracks):
@@ -1109,10 +1302,18 @@ class DarkSnailHighSpeedTracker:
         # Stage 4: Factorize Active Causal Generators G_act from Passive Decoys Omega_reg
         active_causal, passive_decoys = self._factorize_causal_action_ratio(self.active_tracks)
 
-        # Assemble diagnostics
+        # Assemble live cascade & triad diagnostics
+        live_radial_drift = 0.0
+        live_orth_err = float(getattr(self, "_last_triad_orth_err", 0.0))
+        if len(self.active_tracks) > 0:
+            t0 = self.active_tracks[0]
+            c_drift, c_orth = self._step_live_cascade_diagnostics(float(t0.x[2]), float(t0.x[3]))
+            live_radial_drift = c_drift
+            live_orth_err = max(live_orth_err, c_orth)
+
         diagnostics = {
-            "radial_drift": 0.0,
-            "max_orthogonality_error": 0.0,
+            "radial_drift": float(live_radial_drift),
+            "max_orthogonality_error": float(live_orth_err),
             "tie_break_gap": float(tie_break_gap),
             "glints_rejected": int(self.glints_rejected),
         }

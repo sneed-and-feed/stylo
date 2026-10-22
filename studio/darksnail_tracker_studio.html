@@ -1655,15 +1655,22 @@ class TrackerArena {
       this.medoids.push({ x: 0, y: 0, s: 0, snr: 0, mass: 0, radius: 2.0, tau: 0, active: false, isSyntheticDecoy: false, parentId: null });
     }
 
-    // Cascade Registers in so(8) (unit vector on S^7)
-    this.cascadeRegisters = new Float32Array(8);
-    this.cascadeRegisters[0] = 1.0;
+    // Cascade Registers in so(8) (unit vector on S^7) & pre-allocated scratch buffers
+    this.cascadeRegisters = new Float32Array([0.75, 0.5, -0.35, 0.2, -0.1, 0.08, -0.05, 0.04]);
+    let initNorm = 0.0;
+    for (let i = 0; i < 8; i++) initNorm += this.cascadeRegisters[i] * this.cascadeRegisters[i];
+    initNorm = Math.sqrt(initNorm);
+    for (let i = 0; i < 8; i++) this.cascadeRegisters[i] = Math.fround(this.cascadeRegisters[i] / initNorm);
+    this.cascadeZHTemp = new Float32Array([1.0, 0.25, -0.25, 0.125, 0.0, 0.0, 0.0, 0.0]);
+    this.cascadeVTemp = new Float32Array(8);
+    this.cascadeVDotTemp = new Float32Array(8);
 
     // Tracking State
     this.tracks = [];       // DarkSnail Tracks
     this.legacyTracks = []; // PatchAvgKalmanIoU Baseline Tracks
 
     this.tieBreakGap = 0.0;
+    this.orthoErr = 0.0;
     this.radialDrift = 0.0;
     this.w1Dist = 0.0;
     this.bgInitialized = false;
@@ -2313,9 +2320,34 @@ function evaluateTriadTieBreak(trackA, trackB) {
     return 0.0;
   }
 
-  // Skew-symmetric kernel W(i, c1, c2) = -W(i, c2, c1)
+  // Skew-symmetric triad operator B_W(u, v) in so(8) with 2-pass Kahan tangent projection
+  const normU = Math.hypot(uX, uY) + 1e-6;
+  const u0 = Math.fround(uX / normU);
+  const v0 = Math.fround(dx / (dist + 1e-6));
+  const v1 = Math.fround(dy / (dist + 1e-6));
+  let b0 = Math.fround(2.0 * u0 * v1);
+  let b1 = Math.fround(-2.0 * u0 * v0);
+  const vNormSq = v0 * v0 + v1 * v1;
+  if (vNormSq > 1e-20) {
+    for (let pass = 0; pass < 2; pass++) {
+      const projC = (v0 * b0 + v1 * b1) / vNormSq;
+      b0 = Math.fround(b0 - projC * v0);
+      b1 = Math.fround(b1 - projC * v1);
+    }
+    const rem = v0 * b0 + v1 * b1;
+    if (Math.abs(rem) > 1e-8) {
+      if (Math.abs(v0) >= Math.abs(v1) && Math.abs(v0) > 1e-7) {
+        b0 = Math.fround(b0 - rem / v0);
+      } else if (Math.abs(v1) > 1e-7) {
+        b1 = Math.fround(b1 - rem / v1);
+      }
+    }
+  }
+  const pairOrthoErr = Math.abs(v0 * b0 + v1 * b1);
+  arena.orthoErr = Math.max(arena.orthoErr || 0.0, pairOrthoErr);
+
   const crossMomentum = (uX * dy - uY * dx) / (dist + 1e-5);
-  const deltaLogit = Math.abs(crossMomentum) * 2.0 + 0.1875;
+  const deltaLogit = Math.abs(b0 - b1) + Math.abs(crossMomentum) * 2.0;
   arena.tieBreakGap = Math.max(arena.tieBreakGap, deltaLogit);
   document.getElementById('stat-tie-gap').innerText = arena.tieBreakGap.toFixed(3);
   return deltaLogit;
@@ -2323,36 +2355,82 @@ function evaluateTriadTieBreak(trackA, trackB) {
 
 /**
  * Unrolled SlowFastTriadCascade in so(8) across K=16 steps (Theorems 2.3 & 2.6)
- * Preserves exact radial norm drift = 0.000e+00 in float32
+ * Preserves exact radial norm drift = 0.000e+00 and tangent orthogonality <= 1e-8 in float32
  */
 function stepSlowFastCascade(zH, zL, K = 16) {
-  let norm0 = 0.0;
-  for (let i = 0; i < 8; i++) norm0 += zL[i] * zL[i];
-  norm0 = Math.sqrt(norm0);
+  let targetSq = 0.0;
+  for (let i = 0; i < 8; i++) targetSq += zL[i] * zL[i];
+  let norm0 = Math.sqrt(targetSq);
   if (norm0 < 1e-8) {
     zL[0] = 1.0;
+    targetSq = 1.0;
     norm0 = 1.0;
   }
 
-  const v = new Float32Array(zL);
-  const vDot = new Float32Array(8);
+  const v = arena.cascadeVTemp || new Float32Array(8);
+  const vDot = arena.cascadeVDotTemp || new Float32Array(8);
+  v.set(zL);
+  let maxStepOrtho = 0.0;
+
   for (let step = 0; step < K; step++) {
+    vDot.fill(0.0);
+    // Skew-symmetric action S(zH) * v in so(8)
     for (let i = 0; i < 8; i++) {
-      const j = (i + 1) % 8;
-      vDot[i] = (zH[j] * v[j] - zH[i] * v[i]) * 0.05;
+      const j = (i + 1) & 7;
+      const g = (zH[i] - zH[j]) * 0.05;
+      vDot[i] = Math.fround(vDot[i] + g * v[j]);
+      vDot[j] = Math.fround(vDot[j] - g * v[i]);
     }
-    for (let i = 0; i < 8; i++) v[i] += vDot[i];
+    // 2-pass Kahan/Parlett tangent projection onto v^\perp in float32
+    let vSq = 0.0;
+    for (let i = 0; i < 8; i++) vSq += v[i] * v[i];
+    if (vSq > 1e-20) {
+      for (let pass = 0; pass < 2; pass++) {
+        let dotVVd = 0.0;
+        for (let i = 0; i < 8; i++) dotVVd += v[i] * vDot[i];
+        const projC = dotVVd / vSq;
+        for (let i = 0; i < 8; i++) vDot[i] = Math.fround(vDot[i] - projC * v[i]);
+      }
+      let rem = 0.0;
+      let jMax = 0;
+      for (let i = 0; i < 8; i++) {
+        rem += v[i] * vDot[i];
+        if (Math.abs(v[i]) > Math.abs(v[jMax])) jMax = i;
+      }
+      if (Math.abs(rem) > 1e-8 && Math.abs(v[jMax]) > 1e-7) {
+        vDot[jMax] = Math.fround(vDot[jMax] - rem / v[jMax]);
+      }
+    }
+    let orthoStep = 0.0;
+    for (let i = 0; i < 8; i++) orthoStep += v[i] * vDot[i];
+    maxStepOrtho = Math.max(maxStepOrtho, Math.abs(orthoStep));
+
+    for (let i = 0; i < 8; i++) v[i] = Math.fround(v[i] + vDot[i]);
     let normStep = 0.0;
     for (let i = 0; i < 8; i++) normStep += v[i] * v[i];
     normStep = Math.sqrt(normStep);
     const scale = norm0 / (normStep + 1e-12);
-    for (let i = 0; i < 8; i++) v[i] *= scale;
+    for (let i = 0; i < 8; i++) v[i] = Math.fround(v[i] * scale);
+
+    // Coordinate-wise residual square-root polish in float32
+    let curSq = 0.0;
+    let jMax = 0;
+    for (let i = 0; i < 8; i++) {
+      curSq += v[i] * v[i];
+      if (Math.abs(v[i]) > Math.abs(v[jMax])) jMax = i;
+    }
+    if (curSq !== targetSq) {
+      const otherSq = curSq - v[jMax] * v[jMax];
+      const remSq = Math.max(0.0, targetSq - otherSq);
+      v[jMax] = Math.fround((v[jMax] >= 0 ? 1.0 : -1.0) * Math.sqrt(remSq));
+    }
   }
 
   let finalNorm = 0.0;
   for (let i = 0; i < 8; i++) finalNorm += v[i] * v[i];
   finalNorm = Math.sqrt(finalNorm);
   arena.radialDrift = Math.abs(finalNorm - norm0);
+  arena.orthoErr = maxStepOrtho;
   arena.cascadeRegisters.set(v);
   return v;
 }
@@ -3143,7 +3221,7 @@ function runDarkSnailTrackerStep(arena) {
   }
 
   // Update SlowFast Triad Cascade in so(8) (Theorem 2.6)
-  stepSlowFastCascade(new Float32Array([1, 0, 0, 0, 0, 0, 0, 0]), arena.cascadeRegisters, 16);
+  stepSlowFastCascade(arena.cascadeZHTemp, arena.cascadeRegisters, 16);
 
   // Stage 4: Decoy Factorization
   factorizeCausalDecoys(activeTracks);
@@ -3983,10 +4061,46 @@ function verifyFormalTheorems() {
   }
   document.getElementById('badge-thm21').innerHTML = `Thm 2.1 (so(C) Antisym): <span class="metric">PASS ${maxAntisymResidual.toExponential(1)}</span>`;
 
-  const tieBreakGap = Math.max(0.1875, arena.tieBreakGap);
+  // Live Theorem 2.2 & 2.3 evaluation from arena state and skew-symmetric triad operator B_W(u, v)
+  let liveGap = arena.tieBreakGap;
+  const vReg = arena.cascadeRegisters;
+  const uReg = arena.cascadeZHTemp;
+  const bTest = arena.cascadeVDotTemp;
+  bTest.fill(0.0);
+  for (let i = 0; i < 8; i++) {
+    const j = (i + 1) & 7;
+    const g = uReg[i] - uReg[j];
+    bTest[i] = Math.fround(bTest[i] + g * vReg[j]);
+    bTest[j] = Math.fround(bTest[j] - g * vReg[i]);
+  }
+  let vSq = 0.0;
+  for (let i = 0; i < 8; i++) vSq += vReg[i] * vReg[i];
+  if (vSq > 1e-20) {
+    for (let pass = 0; pass < 2; pass++) {
+      let dotVB = 0.0;
+      for (let i = 0; i < 8; i++) dotVB += vReg[i] * bTest[i];
+      const projC = dotVB / vSq;
+      for (let i = 0; i < 8; i++) bTest[i] = Math.fround(bTest[i] - projC * vReg[i]);
+    }
+    let rem = 0.0;
+    let jMax = 0;
+    for (let i = 0; i < 8; i++) {
+      rem += vReg[i] * bTest[i];
+      if (Math.abs(vReg[i]) > Math.abs(vReg[jMax])) jMax = i;
+    }
+    if (Math.abs(rem) > 1e-8 && Math.abs(vReg[jMax]) > 1e-7) {
+      bTest[jMax] = Math.fround(bTest[jMax] - rem / vReg[jMax]);
+    }
+  }
+  let liveDot = 0.0;
+  for (let i = 0; i < 8; i++) liveDot += vReg[i] * bTest[i];
+  const orthoErr = Math.max(arena.orthoErr || 0.0, Math.abs(liveDot));
+  if (liveGap <= 0.0) {
+    liveGap = Math.abs(bTest[0] - bTest[1]);
+  }
+  const tieBreakGap = liveGap;
   document.getElementById('badge-thm22').innerHTML = `Thm 2.2 (Tie-Break): <span class="metric">PASS Δℓ=${tieBreakGap.toFixed(2)}</span>`;
 
-  const orthoErr = 3.42e-9;
   document.getElementById('badge-thm23').innerHTML = `Thm 2.3 (Tangent Ortho): <span class="metric">PASS ${orthoErr.toExponential(1)}</span>`;
 
   document.getElementById('badge-thm24').innerHTML = `Thm 2.4/2.7 (Step-0): <span class="metric">PASS 0.0e+0</span>`;
@@ -3996,6 +4110,13 @@ function verifyFormalTheorems() {
 
   document.getElementById('badge-thm26').innerHTML = `Thm 2.6 (Cascade): <span class="metric">PASS ${arena.radialDrift.toExponential(1)}</span>`;
 
+  const allPassed = (
+    maxAntisymResidual === 0.0 &&
+    tieBreakGap > 0.0 &&
+    orthoErr <= 1.0e-8 &&
+    arena.radialDrift <= 1.0e-7
+  );
+
   return {
     thm_2_1_antisymmetry_residual: maxAntisymResidual,
     thm_2_2_tie_break_gap: tieBreakGap,
@@ -4003,7 +4124,7 @@ function verifyFormalTheorems() {
     thm_2_4_step0_homotopy_residual: 0.0,
     thm_2_5_medoid_preservation: CONFIG.patchBlur ? 0.0306 : 1.0,
     thm_2_6_cascade_radial_drift: arena.radialDrift,
-    all_passed: true,
+    all_passed: allPassed,
   };
 }
 
@@ -5000,14 +5121,13 @@ function mainLoop(timestamp, singleStep = false) {
     }
 
     const tEnd = performance.now();
-    const latencyUs = Math.max(45.0, (tEnd - tStart) * 1000.0);
+    const latencyUs = (tEnd - tStart) * 1000.0;
     STATE.latencyFiltered = 0.88 * STATE.latencyFiltered + 0.12 * latencyUs;
 
     frameCount++;
     if (timestamp - lastFpsUpdate > 250) {
-      const measuredFps = (frameCount * 1000.0) / (timestamp - lastFpsUpdate);
-      const kernelFps = 1000000.0 / Math.max(80.0, STATE.latencyFiltered);
-      STATE.fpsFiltered = Math.max(measuredFps, Math.min(2400.0, kernelFps * 0.25));
+      const measuredFps = (frameCount * 1000.0) / Math.max(1e-3, timestamp - lastFpsUpdate);
+      STATE.fpsFiltered = measuredFps;
       frameCount = 0;
       lastFpsUpdate = timestamp;
       verifyFormalTheorems();

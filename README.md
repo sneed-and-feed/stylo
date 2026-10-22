@@ -11,10 +11,16 @@
 By unifying machine-checked Lie-algebraic anti-swap operators $(\mathfrak{so}(C))$, exterior-curl flux shielding, discrete mass continuity, and a whitened 3-point causal deferral gate, Stylo achieves **240–9,400+ FPS** single-core throughput within a fixed $< 2.0\text{ MB}$ on-chip SRAM cache footprint—completely eliminating GPU dependencies, pretrained neural network weights, and DRAM bus stalls.
 
 ![DarkSnail Tactical Studio — Scenario 03: Symmetric 4-Way Crossing Occlusion (`0` ID Swaps vs. Legacy Kalman/IoU)](docs/assets/studio_scenario03_crossing.png)
-**Figure 1 — Scenario 03 (`03_symmetric_crossing_occlusion`):** Four identical-intensity targets colliding head-on at the center of a $128\times 128$ grid. **Quad A** overlays Tier-1 Beltrami exterior-curl reticles (cyan) and Tier-2 RoPE-2D medoid crosshairs (yellow); **Quad B** quarantines specular glare washouts and reversible clutter into $M_{\text{clock}}$ (amber) while isolating mass-conservative targets into $H_{\text{nope}}$ (emerald); **Quad C** demonstrates $\mathfrak{so}(C)$ skew-symmetric triad tie-breaking (`0` DarkSnail ID swaps vs. `4` legacy Kalman/IoU swaps); **Quad D** displays active causal generators ($G_{\text{act}}$, green stars) and live Theorem 2.1–2.7 verification.
+**Figure 1 — Scenario 03 (`03_symmetric_crossing_occlusion`):** Four identical-intensity targets colliding head-on at the center of a $128\times 128$ grid. **Quad A** overlays Tier-1 Beltrami exterior-curl reticles (cyan) and Tier-2 RoPE-2D medoid crosshairs (yellow);
+**Quad B** quarantines specular glare washouts and reversible clutter into $M_{\text{clock}}$ (amber)
+while isolating mass-conservative targets into $H_{\text{nope}}$ (emerald);
+**Quad C** demonstrates $\mathfrak{so}(C)$ skew-symmetric triad tie-breaking (`0` DarkSnail ID swaps vs. `4` legacy Kalman/IoU swaps); **Quad D** displays active causal generators ($G_{\text{act}}$, green stars) and live Theorem 2.1–2.7 verification.
 
 ![DarkSnail Tactical Studio — Scenario 04: 12-Target Decoy Swarm Factorization & HUD Clutter Quarantine](docs/assets/studio_scenario04_decoy_swarm.png)
-**Figure 2 — Scenario 04 (`04_decoy_swarm_factorization`):** Twelve-target swarm maneuvering beneath a high-contrast scrolling HUD bar. Stage 2's continuity splitter quarantines the top HUD bar into $M_{\text{clock}}$, while Stage 4's non-local causal action ratio $\eta_{\text{nonlocal}}$ partitions the **2 active maneuvering command vehicles** ($G_{\text{act}}$, green stars in Quad D) from the **10 slaved repeater decoys** ($\Omega_{\text{reg}}$, red crosses with dashed slaved coupling lines).
+**Figure 2 — Scenario 04 (`04_decoy_swarm_factorization`):** Twelve-target swarm maneuvering beneath a high-contrast scrolling HUD bar. Stage 2's continuity splitter quarantines the top HUD bar into $M_{\text{clock}}$,
+while Stage 4's non-local causal action ratio $\eta_{\text{nonlocal}}$ partitions the
+**2 active maneuvering command vehicles** ($G_{\text{act}}$, green stars in Quad D)
+from the **10 slaved repeater decoys** ($\Omega_{\text{reg}}$, red crosses with dashed slaved coupling lines).
 
 ---
 
@@ -87,19 +93,26 @@ Incoming Stream (Y8 Frame F_t, dt)
   - Safely handles negative time steps ($\Delta t < 0$ raises explicit `ValueError`), non-finite lookahead (defers to `"pending_impulse"` instead of failing open), and caller belief replacement between steps.
 
 ### Stage 2: Exogenous Strobe, HUD & Reversible Clutter Immunity
-- **Continuity Law Decomposition:** Evaluates discrete flux divergence $\partial_t \rho_c + \text{div}(J_c) = \sigma_c$. Quarantines exogenous sources with non-conservative sources/sinks ($\sigma_c \neq 0$) into $M_{\text{clock}}$, isolating mass-conservative translating targets ($\sigma_c = 0$) into $H_{\text{nope}}$.
-- **Thermodynamic Irreversibility Guard:** Pixels cycling reversibly back to historical values $(F_{t+1}(y, x) = F_{t-k}(y, x) \text{ for } k \in \lbrace 2, 3, 4 \rbrace)$ are identified as periodic clutter (100/120 Hz PWM LED flicker, stationary/scrolling HUD overlays, water ripples, swaying foliage) and assigned to $M_{\text{clock}}$.
+- **Continuity Law Decomposition:** Evaluates discrete flux divergence $\partial_t \rho_c + \text{div}(J_c) = \sigma_c$.
+  Quarantines exogenous sources with non-conservative sources/sinks ($\sigma_c \neq 0$)
+  into $M_{\text{clock}}$,
+  isolating mass-conservative translating targets ($\sigma_c = 0$)
+  into $H_{\text{nope}}$.
+- **Thermodynamic Irreversibility Guard:** Pixels cycling reversibly back to historical values $(F_{t+1}(y, x) = F_{t-k}(y, x) \text{ for } k \in \lbrace 2, 3, 4 \rbrace)$
+  are identified as periodic clutter (100/120 Hz PWM LED flicker, stationary/scrolling HUD overlays, water ripples, swaying foliage) and assigned to $M_{\text{clock}}$.
 - **Retroactive Track Stitching:** Re-links fragmented trajectories across the 8-frame circular ring buffer (`_rebuild_projected_graph`) whenever transient clutter masks update.
 
 ### Stage 3: Anti-Swap Skew-Symmetric Occlusion Crossing & Spherical Cascade
-- **Skew-Symmetric Triad Operator:** In multi-target collision zones $(\lVert x_i - x_j \rVert \le r_{\text{collision}})$, classical distance and IoU metrics produce symmetric ties where standard Hungarian matchers swap IDs. Evaluating $B_W(u_{\text{occ}}, v_{\text{comp}}) \in \mathfrak{so}(C)$ using directional approach momentum and occlusion parity injects an exact antisymmetric gap:
+- **Skew-Symmetric Triad Operator:** In multi-target collision zones $(\lVert x_i - x_j \rVert \le r_{\text{collision}})$,
+  classical distance and IoU metrics produce symmetric ties where standard Hungarian matchers swap IDs. Evaluating $B_W(u_{\text{occ}}, v_{\text{comp}}) \in \mathfrak{so}(C)$ using directional approach momentum and occlusion parity injects an exact antisymmetric gap:
 
 ```math
 \ell_{\text{post}}(c_1) - \ell_{\text{post}}(c_2) = 2 \beta \alpha (W_{i_0, c_2, c_1} - W_{i_0, c_1, c_2}) > 0
 ```
 
 deterministically breaking ties with **zero (0) track-ID swaps**.
-- **SlowFast Triad Cascade:** Couples slow kinematic momentum ($z_H$) to fast 240 Hz frame deltas ($z_L$) across unrolled steps $K \in \lbrace 1, 4, 8, 16 \rbrace$ in $\mathfrak{so}(8)$ via tangent rotations with exact float32 unit-sphere retraction ($0.000\times 10^0$ radial drift).
+- **SlowFast Triad Cascade:** Couples slow kinematic momentum ($z_H$)
+  to fast 240 Hz frame deltas ($z_L$) across unrolled steps $K \in \lbrace 1, 4, 8, 16 \rbrace$ in $\mathfrak{so}(8)$ via tangent rotations with exact float32 unit-sphere retraction ($0.000\times 10^0$ radial drift).
 
 ### Stage 4: One-Shot $SE(2)$ Kinematics, $W_1^{\text{marg}}$ Intercepts & Decoy Factorization
 - **1D Marginal Wasserstein-1 Distance** ($W_1^{\text{marg}}$): Closed-form $O(HW)$ cumulative distribution integral along coordinate axes computes exact transport costs without combinatorial $O(N^3)$ Hungarian overhead or sub-pixel IoU sensitivity collapse.
@@ -109,7 +122,8 @@ deterministically breaking ties with **zero (0) track-ID swaps**.
 \eta_{\text{nonlocal}} = \frac{N_{\text{nonlocal}}}{N_{\text{local}} + N_{\text{nonlocal}}}
 ```
 
-Partitions **Active Causal Generators** ($G_{\text{act}}, \eta_{\text{nonlocal}} \ge 0.50$) executing autonomous non-linear maneuvers from **Driven Passive Registers / Decoys** ($\Omega_{\text{reg}}, \eta_{\text{nonlocal}} < 0.50$) following slaved trajectory manifolds.
+Partitions **Active Causal Generators** ($G_{\text{act}}, \eta_{\text{nonlocal}} \ge 0.50$) executing autonomous non-linear maneuvers
+from **Driven Passive Registers / Decoys** ($\Omega_{\text{reg}}, \eta_{\text{nonlocal}} < 0.50$) following slaved trajectory manifolds.
 
 ---
 
@@ -119,7 +133,7 @@ All core algebraic operators are verified by machine-checked proofs in Lean 4 (`
 
 | Theorem | Lean 4 Declaration | Mathematical Invariant | Empirical Verification | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **Theorems 2.1 & 2.2** | `skew_triad_swap_neg`<br>`occlusion_triad_breaks_symmetric_tie` | Skew-symmetry $S(W, i, c_2, c_1) = -S(W, i, c_1, c_2)$ and deterministic tie-breaking gap $\ell_{\text{post}}(c_1) - \ell_{\text{post}}(c_2) > 0$ | Exact $0.000\times 10^0$ residual;<br>Tie-break gap $0.1875 > 0$;<br>**0 track-ID swaps** | **PASS** |
+| **Theorems 2.1 & 2.2** | `skew_triad_swap_neg`<br>`occlusion_triad_breaks_symmetric_tie` | Skew-symmetry and deterministic tie-breaking gap $\ell_{\text{post}}(c_1) - \ell_{\text{post}}(c_2) > 0$ | Exact $0.000\times 10^0$ residual;<br>Tie-break gap $0.1875 > 0$;<br>**0 track-ID swaps** | **PASS** |
 | **Theorems 2.3 & 2.6** | `darksnail_readout_energy_conservation`<br>`darksnail_multistep_spherical_invariance` | Pointwise tangent orthogonality $\lvert\langle v, B_W(u, v) \rangle\rvert \le 1.0\times 10^{-8}$ and spherical norm conservation | Orthogonality error $\le 1.0\times 10^{-8}$;<br>Radial drift $0.000\times 10^0$ across $K \in \lbrace 1, 4, 8, 16 \rbrace$ unrolled steps | **PASS** |
 | **Theorems 2.4 & 2.7** | `darksnail_step0_system1_homotopy`<br>`darksnail_multistep_step0_homotopy` | Bit-identical reduction to baseline state trajectory when $\Delta z = 0$ or `InnovationSpikeGateConfig = None` | Bit-identical across 1,000+ updates ($0.000\times 10^0$ residual) | **PASS** |
 | **Theorem 2.5** | `rope2d_medoid_relative_invariance`<br>`rope2d_arithmetic_norm_lt` | 2D axial RoPE relative shift invariance vs. strict arithmetic patch-averaging norm attenuation | Medoid shift error $\le 4.77\times 10^{-7} \le 1.0\times 10^{-6}$;<br>$96.94\%$ patch-averaging attenuation | **PASS** |
@@ -156,7 +170,9 @@ Stylo includes a reproducible, zero-leakage **Mode B Blind 240 Hz Benchmark** (`
 1. **`01_subpixel_ballistic_glint`**: $1\times 1$ and $2\times 2\text{ px}$ ballistic targets ($v = 6.5\text{ px/frame}$) under $10\%$ specular glare washouts and $20\text{ dB}$ noise. Tests Theorem 2.5 sub-pixel survival vs. $96.94\%$ patch-averaging dilution + Morse glint rejection.
 2. **`02_pwm_strobe_foliage_notch`**: Tangential target ($v = 0.5 \to 0.0 \to 1.5\text{ px/frame}$, "Doppler notch") moving through $120\text{ Hz}$ PWM LED strobe flicker and reversibly swaying foliage clutter $(F_{t+1} = F_{t-k})$.
 3. **`03_symmetric_crossing_occlusion`**: 4 targets of identical intensity crossing simultaneously at the center ($90^\circ$ and $180^\circ$ head-on collisions with 5-frame full occlusion). Tests Theorem 2.2 $0\%$ ID-swap guarantee.
-4. **`04_decoy_swarm_factorization`**: 2 active maneuvering command vehicles ($G_{\text{act}}$) surrounded by 10 slaved reflection/repeater decoys ($\Omega_{\text{reg}}$) and a scrolling HUD countdown bar ($H_{\text{clock}}$).
+4. **`04_decoy_swarm_factorization`**: 2 active maneuvering command vehicles ($G_{\text{act}}$)
+   surrounded by 10 slaved reflection/repeater decoys ($\Omega_{\text{reg}}$)
+   and a scrolling HUD countdown bar ($H_{\text{clock}}$).
 5. **`05_evasive_step_burn_maneuver`**: $\text{High-}g$ instantaneous $\Delta v$ step maneuver interleaved with single-frame $6\sigma$ optical glints. Tests 1-sample `pending_impulse` deferral + exact $H^{-1}$ step re-initialization vs. process-noise lag.
 
 Run the full benchmark suite:
@@ -216,7 +232,7 @@ Run the full adversarial referee, numerical parity, and headless HTML5 Studio ve
 ```bash
 pytest tests/test_darksnail_tracker.py -v
 ```
-All 21 verification tests pass with **0 skips and 0 failures**, validating causal purity, AST anti-leakage invariants, formal Lean 4 theorems, edge-case causal deferral, heap memory limits ($< 2.0\text{ MB}$), single-core throughput targets ($> 165\text{ FPS}$ Python, $> 2,000\text{ FPS}$ Rust SIMD), and headless Chromium HTML5 Studio self-tests across all 5 scenarios, WebRTC toggles, and ArrayBuffer exports.
+All 22 verification tests pass with **0 skips and 0 failures**, validating causal purity, AST anti-leakage invariants, formal Lean 4 theorems, edge-case causal deferral, heap memory limits ($< 2.0\text{ MB}$), single-core throughput targets ($> 165\text{ FPS}$ Python, $> 2,000\text{ FPS}$ Rust SIMD), and headless Chromium HTML5 Studio self-tests across all 5 scenarios, WebRTC toggles, and ArrayBuffer exports.
 
 ---
 

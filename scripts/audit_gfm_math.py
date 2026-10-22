@@ -155,9 +155,21 @@ def audit_file(filepath: str) -> int:
 
 
 if __name__ == "__main__":
-    targets = sys.argv[1:] if len(sys.argv) > 1 else ["papers/darksnail_v2_preprint.md"]
+    import os
+
+    if len(sys.argv) > 1:
+        targets = sys.argv[1:]
+    elif os.path.exists("papers/darksnail_v2_preprint.md"):
+        targets = ["papers/darksnail_v2_preprint.md"]
+    else:
+        targets = [
+            f
+            for f in ("README.md", "docs/DARKSNAIL_HIGH_SPEED_TRACKER_ARCHITECTURE.md")
+            if os.path.exists(f)
+        ]
     rc = 0
     for target in targets:
         rc |= audit_file(target)
     sys.exit(rc)
+
 
