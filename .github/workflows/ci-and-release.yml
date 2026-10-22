@@ -1,0 +1,138 @@
+name: Cross-Platform CI, Rust SIMD Kernel & Release
+
+on:
+  push:
+    branches: ["main", "master"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-matrix:
+    name: Rust C-ABI, Pytest, Gate-2 Challenge & Math Audit (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/darksnail_tracker_rs/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/darksnail_tracker_rs/Cargo.toml', 'rust/darksnail_tracker_rs/src/**') }}
+
+      - name: Build & test #![no_std] Rust SIMD C-ABI kernel
+        working-directory: rust/darksnail_tracker_rs
+        run: |
+          cargo test --release
+          cargo build --release
+        shell: bash
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install CPU PyTorch & Stylo dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            pip install torch numpy scipy safetensors pytest
+          else
+            pip install --extra-index-url https://download.pytorch.org/whl/cpu torch numpy scipy safetensors pytest
+          fi
+          pip install -e .
+        shell: bash
+
+      - name: Run GFM / KaTeX Math Compliance Audit (All 21 Rules)
+        run: python scripts/audit_gfm_math.py README.md
+        shell: bash
+
+      - name: Validate Tactical HTML Studio JavaScript Syntax
+        run: |
+          python -c "import pathlib, re, subprocess; html = pathlib.Path('studio/darksnail_tracker_studio.html').read_text(encoding='utf-8'); scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, flags=re.S); tmp = pathlib.Path('results/_ci_studio_check.js'); tmp.parent.mkdir(exist_ok=True); tmp.write_text('\n'.join(scripts), encoding='utf-8'); subprocess.run(['node', '--check', str(tmp)], check=True); tmp.unlink()"
+        shell: bash
+
+      - name: Verify Native Rust C-ABI Bridge Auto-Detection
+        run: |
+          python -c "from darksnail._tracker_native import is_available, NATIVE_LIB_PATH, _NATIVE_LIB; assert is_available(), 'Native Rust C-ABI bridge failed to load!'; print('Loaded native C-ABI:', NATIVE_LIB_PATH, 'Arena bytes:', _NATIVE_LIB.tracker_get_arena_size_bytes())"
+        shell: bash
+
+      - name: Run Cross-Platform Pytest Verification Suite
+        run: pytest tests/test_darksnail_tracker.py -v
+        shell: bash
+
+      - name: Run 5-Part Adversarial Gate-2 Challenge Suite
+        run: python scripts/adversarial_gate_2_challenge.py
+        shell: bash
+
+      - name: Run 5-Scenario Tracker Benchmark & Monte Carlo Audit
+        if: matrix.os == 'ubuntu-latest'
+        run: python -m darksnail.tracker_benchmark
+        shell: bash
+
+      - name: Upload Native C-ABI Library & Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: stylo-${{ matrix.os }}-artifacts
+          path: |
+            rust/darksnail_tracker_rs/target/release/libdarksnail_tracker_rs.so
+            rust/darksnail_tracker_rs/target/release/libdarksnail_tracker_rs.dylib
+            rust/darksnail_tracker_rs/target/release/darksnail_tracker_rs.dll
+            studio/darksnail_tracker_studio.html
+            results/tracker_benchmark_results.json
+            results/adversarial_gate_2_challenge.json
+
+  publish-release:
+    name: Publish GitHub Release Assets
+    needs: test-matrix
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Python Wheel & Source Distribution
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Download Cross-Platform Native Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish Release Assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+            studio/darksnail_tracker_studio.html
+            results/tracker_benchmark_results.json
+            results/adversarial_gate_2_challenge.json
+            release-assets/**/libdarksnail_tracker_rs.so
+            release-assets/**/libdarksnail_tracker_rs.dylib
+            release-assets/**/darksnail_tracker_rs.dll
+          generate_release_notes: true
