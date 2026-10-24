@@ -281,6 +281,20 @@ All 22 verification tests pass with **0 skips and 0 failures**, validating causa
 
 ---
 
+## Citation
+
+```bibtex
+@software{stylo_2026,
+  author       = {Cohen, Noah},
+  title        = {Stylo: Zero-Weight High-Speed Optical Tracking and 6-DOF Autonomous Intercept Engine},
+  year         = {2026},
+  version      = {0.2.0},
+  url          = {https://github.com/sneed-and-feed/stylo}
+}
+```
+
+---
+
 ## License
 
 Stylo is dedicated to the public domain under the **Creative Commons Zero v1.0 Universal (`CC0-1.0`)** license. You may copy, modify, distribute, and perform the work, even for commercial purposes, all without asking permission.
