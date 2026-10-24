@@ -1,0 +1,16 @@
+{
+  "mission_requirement": "R4.2 Zero-Weight Optical Terminal 6-DOF GNC",
+  "initial_range_m": 500.0,
+  "final_miss_distance_m": 0.04956131588019594,
+  "final_docking_speed_m_s": 0.015531463995454697,
+  "intercept_success": true,
+  "docking_contact_time_s": 168.15,
+  "track_id_swaps": 0,
+  "neural_weights": 0,
+  "glints_injected": 101,
+  "glints_rejected": 10,
+  "maneuvers_detected": 2944,
+  "final_quaternion_norm": 0.9999999999999999,
+  "quaternion_norm_residual": 1.1102230246251565e-16,
+  "trajectory_points": 3364
+}
