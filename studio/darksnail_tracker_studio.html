@@ -2601,48 +2601,79 @@ function sumSqF32(arr) {
 
 function polishActiveCoordsUlpF32(v, targetSq, f32Buf, i32Buf) {
   const n = v.length;
+  const tSq = Math.fround(targetSq);
+  if (!(tSq > 0.0) || !Number.isFinite(tSq)) return;
   let curSq = sumSqF32(v);
-  if (curSq === targetSq) return;
+  if (curSq === tSq || !(curSq > 1e-30)) return;
 
-  // Pass 1: Coordinate-wise residual square-root + 1-coordinate active ULP polish (|v[j]| > 1e-12 only)
-  for (let j = 0; j < n; j++) {
-    if (Math.abs(v[j]) <= 1e-12) continue;
-    curSq = sumSqF32(v);
-    if (curSq === targetSq) return;
-    let otherSq = 0.0;
-    for (let k = 0; k < n; k++) {
-      if (k !== j) otherSq = Math.fround(otherSq + Math.fround(v[k] * v[k]));
+  // Step 0: Dominant active coordinate analytical residual square-root (never clobbers small coordinates)
+  let maxIdx = 0;
+  let maxAbs = -1.0;
+  for (let i = 0; i < n; i++) {
+    const a = Math.abs(v[i]);
+    if (a > maxAbs) {
+      maxAbs = a;
+      maxIdx = i;
     }
-    const remSq = Math.max(0.0, targetSq - otherSq);
-    const sign = v[j] >= 0.0 ? 1.0 : -1.0;
-    const baseZ = Math.fround(sign * Math.sqrt(remSq));
-    let bestZ = baseZ;
-    v[j] = baseZ;
-    let bestErr = Math.abs(sumSqF32(v) - targetSq);
-    f32Buf[0] = baseZ;
-    const baseBits = i32Buf[0];
-    for (let dUlp = -12; dUlp <= 12; dUlp++) {
-      if (dUlp === 0) continue;
-      i32Buf[0] = (baseBits + dUlp) | 0;
-      const candZ = f32Buf[0];
-      if (!Number.isFinite(candZ)) continue;
-      v[j] = candZ;
-      const err = Math.abs(sumSqF32(v) - targetSq);
-      if (err < bestErr) {
-        bestErr = err;
-        bestZ = candZ;
-        if (err === 0.0) {
-          v[j] = bestZ;
-          return;
-        }
+  }
+  if (maxAbs > 1e-12) {
+    let otherSq = Math.fround(0.0);
+    for (let i = 0; i < n; i++) {
+      if (i !== maxIdx) {
+        const vi = Math.fround(v[i]);
+        otherSq = Math.fround(otherSq + Math.fround(vi * vi));
       }
     }
-    v[j] = bestZ;
+    if (otherSq <= tSq) {
+      const origDom = v[maxIdx];
+      const sgn = origDom >= 0.0 ? 1.0 : -1.0;
+      const candDom = Math.fround(sgn * Math.sqrt(Math.max(0.0, tSq - otherSq)));
+      const origErr = Math.abs(sumSqF32(v) - tSq);
+      v[maxIdx] = candDom;
+      if (Math.abs(sumSqF32(v) - tSq) > origErr) {
+        v[maxIdx] = origDom;
+      }
+    }
   }
+  if (sumSqF32(v) === tSq) return;
+
+  // Pass 1: 1-coordinate active ULP polish (strictly |v[i]| > 1e-12, preserves small & zero coordinates)
+  for (let pass = 0; pass < 4; pass++) {
+    let bestErr = Math.abs(sumSqF32(v) - tSq);
+    if (bestErr === 0.0) return;
+    let bestIdx = -1;
+    let bestVal = 0.0;
+    for (let i = 0; i < n; i++) {
+      const orig = v[i];
+      if (Math.abs(orig) <= 1e-12) continue;
+      f32Buf[0] = orig;
+      const origBits = i32Buf[0];
+      for (let dUlp = -16; dUlp <= 16; dUlp++) {
+        if (dUlp === 0) continue;
+        i32Buf[0] = (origBits + dUlp) | 0;
+        const candZ = f32Buf[0];
+        if (!Number.isFinite(candZ)) continue;
+        v[i] = candZ;
+        const err = Math.abs(sumSqF32(v) - tSq);
+        if (err < bestErr) {
+          bestErr = err;
+          bestIdx = i;
+          bestVal = candZ;
+          if (err === 0.0) return;
+        }
+      }
+      v[i] = orig;
+    }
+    if (bestIdx >= 0) {
+      v[bestIdx] = bestVal;
+    } else {
+      break;
+    }
+  }
+  if (sumSqF32(v) === tSq) return;
 
   // Pass 2: 2-coordinate active-pair ULP fallback polish (strictly |v[i]| > 1e-12 && |v[j]| > 1e-12)
-  if (sumSqF32(v) === targetSq) return;
-  let bestErr = Math.abs(sumSqF32(v) - targetSq);
+  let bestErr = Math.abs(sumSqF32(v) - tSq);
   let bestPair = null;
   for (let i = 0; i < n; i++) {
     const origI = v[i];
@@ -2654,18 +2685,18 @@ function polishActiveCoordsUlpF32(v, targetSq, f32Buf, i32Buf) {
       if (Math.abs(origJ) <= 1e-12) continue;
       f32Buf[0] = origJ;
       const bitsJ = i32Buf[0];
-      for (let duI = -8; duI <= 8; duI++) {
+      for (let duI = -12; duI <= 12; duI++) {
         i32Buf[0] = (bitsI + duI) | 0;
         const candI = f32Buf[0];
         if (!Number.isFinite(candI)) continue;
         v[i] = candI;
-        for (let duJ = -8; duJ <= 8; duJ++) {
+        for (let duJ = -12; duJ <= 12; duJ++) {
           if (duI === 0 && duJ === 0) continue;
           i32Buf[0] = (bitsJ + duJ) | 0;
           const candJ = f32Buf[0];
           if (!Number.isFinite(candJ)) continue;
           v[j] = candJ;
-          const err = Math.abs(sumSqF32(v) - targetSq);
+          const err = Math.abs(sumSqF32(v) - tSq);
           if (err === 0.0) return;
           if (err < bestErr) {
             bestErr = err;
