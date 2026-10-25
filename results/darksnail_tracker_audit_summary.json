@@ -1,6 +1,6 @@
 {
   "audit_metadata": {
-    "audit_timestamp": "2026-10-21T11:00:07Z",
+    "audit_timestamp": "2026-10-25T21:20:27Z",
     "referee_agent": "worker_referee_1 (agent-5-referee)",
     "role": "Adversarial Mode B Numerical Referee, tracemalloc & Parity Suite Worker",
     "project": "Stylo High-Speed Optical/IR Video Tracker",
@@ -8,7 +8,7 @@
     "license": "CC0-1.0 Universal Public Domain",
     "audit_standard": "ORIGINAL_REQUEST.md \u00a7 R5 / Mode B Blind Numerical Audit",
     "integrity_mode": "development",
-    "python_environment": "c:\\Users\\x\\Documents\\antigravity\\darksnail\\.venv\\Scripts\\python.exe"
+    "python_environment": "C:\\Users\\x\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
   },
   "literature_grounding": {
     "subpixel_iou_degeneracy_and_wasserstein_geometry": {

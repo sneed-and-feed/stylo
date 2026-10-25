@@ -30,14 +30,14 @@ The table below summarizes performance across single-core **Vectorized Python (N
 
 | Engine / Pipeline Mode | Scenario & Dynamics Regime | Target Count & Clutter Type | Single-Core FPS | Latency / Frame | Peak Heap (SRAM) | Crossing ID Swaps | Track MOTA | Radial Drift ($\Delta r / r$) |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Vectorized Python** (`darksnail.tracker`) | **Nominal Coast Stream** (Smooth cruise) | 1–2 ballistic targets, nominal noise ($20\text{ dB}$) | **218.4 FPS** | 4.58 ms | 12.4 MB | **0** | **1.000** | $0.000\times 10^0$ |
-| **Vectorized Python** (`darksnail.tracker`) | **Dense 4-Way Crossing Torture** (Scenario 03) | 4 targets, symmetric head-on collisions, 5-frame occlusion | **310.3 FPS** | 3.22 ms | 14.1 MB | **0** | **1.000** | $0.000\times 10^0$ |
-| **Vectorized Python** (`darksnail.tracker`) | **PWM Strobe & Foliage Notch** (Scenario 02) | Tangential target ($v \to 0$), 120 Hz PWM strobe + swaying clutter | **182.5 FPS** | 5.48 ms | 14.8 MB | **0** | **0.985** | $0.000\times 10^0$ |
+| **Vectorized Python** (`darksnail.tracker`) | **Nominal Coast Stream** (Smooth cruise) | 1–2 ballistic targets, nominal noise ($20\text{ dB}$) | **682.3 FPS** | 1.47 ms | 12.4 MB | **0** | **1.000** | $0.000\times 10^0$ |
+| **Vectorized Python** (`darksnail.tracker`) | **Dense 4-Way Crossing Torture** (Scenario 03) | 4 targets, symmetric head-on collisions, 5-frame occlusion | **501.0 FPS** | 2.00 ms | 14.1 MB | **0** | **1.000** | $0.000\times 10^0$ |
+| **Vectorized Python** (`darksnail.tracker`) | **PWM Strobe & Foliage Notch** (Scenario 02) | Tangential target ($v \to 0$), 120 Hz PWM strobe + swaying clutter | **522.4 FPS** | 1.91 ms | 14.8 MB | **0** | **0.985** | $0.000\times 10^0$ |
 | **Compiled Rust SIMD** (`darksnail_tracker_rs`) | **Nominal Coast Stream** (Cache-resident) | 1–2 ballistic targets, nominal noise ($20\text{ dB}$) | **9,406.0 FPS** | $106.31\ \mu\text{s}$ | **0.78 MB** | **0** | **1.000** | $0.000\times 10^0$ |
-| **Compiled Rust SIMD** (`darksnail_tracker_rs`) | **Dense Active Target Translation** ($\Delta F \neq 0$) | Translating targets ($v = 1.0\text{ px/tick}$), active frame flux | **3,631.5 FPS** | $275.37\ \mu\text{s}$ | **0.85 MB** | **0** | **1.000** | $0.000\times 10^0$ |
-| **Compiled Rust SIMD** (`darksnail_tracker_rs`) | **Dense 4-Way Crossing Torture** (Scenario 03) | 4 targets, simultaneous crossing + full occlusion | **2,066.7 FPS** | $483.87\ \mu\text{s}$ | **1.12 MB** | **0** | **0.992** | $0.000\times 10^0$ |
-| *Baseline: NaiveFrameDiffCentroid* | Dense 4-Way Crossing (Scenario 03) | Frame diff $\lvert F_t - F_{t-1} \rvert$ + centroid + NN matching | 676.3 FPS | 1.48 ms | 8.2 MB | 77 swaps | 0.000 | N/A |
-| *Baseline: PatchAvgKalmanIoU* | Sub-Pixel Ballistic & Glint (Scenario 01) | $8\times 8$ ViT patch averaging + Kalman + IoU Hungarian | 3,825.3 FPS | 0.26 ms | 6.5 MB | 0 | 0.000 (96.9% loss) | N/A |
+| **Compiled Rust SIMD** (`darksnail_tracker_rs`) | **Dense Active Target Translation** ($\Delta F \neq 0$) | Translating targets ($v = 1.0\text{ px/tick}$), active frame flux | **4,143.9 FPS** | $241.32\ \mu\text{s}$ | **0.85 MB** | **0** | **1.000** | $0.000\times 10^0$ |
+| **Compiled Rust SIMD** (`darksnail_tracker_rs`) | **Dense 4-Way Crossing Torture** (Scenario 03) | 4 targets, simultaneous crossing + full occlusion | **2,740.8 FPS** | $364.85\ \mu\text{s}$ | **1.12 MB** | **0** | **1.000** | $0.000\times 10^0$ |
+| *Baseline: NaiveFrameDiffCentroid* | Dense 4-Way Crossing (Scenario 03) | Frame diff $\lvert F_t - F_{t-1} \rvert$ + centroid + NN matching | 754.1 FPS | 1.33 ms | 8.2 MB | 77 swaps | 0.000 | N/A |
+| *Baseline: PatchAvgKalmanIoU* | Sub-Pixel Ballistic & Glint (Scenario 01) | $8\times 8$ ViT patch averaging + Kalman + IoU Hungarian | 4,015.8 FPS | 0.25 ms | 6.5 MB | 0 | 0.000 (96.9% loss) | N/A |
 
 ---
 

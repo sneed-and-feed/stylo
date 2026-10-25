@@ -333,6 +333,11 @@ def run_all_stress_tests() -> List[TestResult]:
             eval_rust = evaluate_trajectory_continuity(tr_rust, scen)
             bm_rust = eval_rust["blind_metrics"]
             status_rust = "PASS" if bm_rust["id_swaps"] == 0 and eval_rust["pre_post_match"] and bm_rust["mota"] >= 0.95 else "BUG"
+            details_rust = (
+                f"MOTA={bm_rust['mota']*100:.1f}%, IDSW={bm_rust['id_swaps']}, CosSim={eval_rust['mean_cos_sim']:.3f}"
+                if status_rust == "PASS"
+                else f"CRITICAL BUG: MOTA={bm_rust['mota']*100:.1f}%, IDSW={bm_rust['id_swaps']}, FN={bm_rust['fn']} (Rust kernel fails on multi-target occlusion)"
+            )
             results.append(TestResult(
                 scenario_id=f"S1_canonical_{grid_sz}_rust",
                 description=f"Canonical 4-target 90/180 crossing @ {grid_sz}x{grid_sz} (Rust SIMD)",
@@ -346,7 +351,7 @@ def run_all_stress_tests() -> List[TestResult]:
                 mota=bm_rust["mota"],
                 fps=bm_rust["fps"],
                 status=status_rust,
-                details=f"CRITICAL BUG: MOTA={bm_rust['mota']*100:.1f}%, IDSW={bm_rust['id_swaps']}, FN={bm_rust['fn']} (Rust kernel fails on multi-target occlusion due to single partner limitation and missing coasting outputs)",
+                details=details_rust,
             ))
             print(f"[{status_rust}] Canonical {grid_sz}x{grid_sz} (Rust): MOTA={bm_rust['mota']*100:.1f}%, IDSW={bm_rust['id_swaps']}, PrePostMatch={eval_rust['pre_post_match']}")
 

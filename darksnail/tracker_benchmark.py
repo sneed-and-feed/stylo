@@ -1636,6 +1636,9 @@ def run_benchmark(
             data_to_write["benchmark_5_scenarios_summary"] = results["scenarios"]
             data_to_write["monte_carlo_300_trials_audit"] = results["monte_carlo_sweep"]
             data_to_write["benchmark_timestamp"] = results["timestamp"]
+            if "audit_metadata" in data_to_write and isinstance(data_to_write["audit_metadata"], dict):
+                data_to_write["audit_metadata"]["audit_timestamp"] = results["timestamp"]
+                data_to_write["audit_metadata"]["python_environment"] = sys.executable
             data_to_write["benchmark_mode"] = results["mode"]
             data_to_write["literature_citations"] = results["literature_citations"]
             data_to_write["coast_vs_active_collision_breakdown"] = results["coast_vs_active_collision_breakdown"]

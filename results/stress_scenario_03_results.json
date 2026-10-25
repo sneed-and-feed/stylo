@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-25T21:22:04Z",
+  "timestamp": "2026-10-25T22:15:40Z",
   "total_test_cases": 38,
   "passed": 21,
   "bugs_found": 0,
@@ -16,7 +16,7 @@
       "mean_cos_sim": 0.9756112657592355,
       "rmse": 0.7105925920750994,
       "mota": 1.0,
-      "fps": 505.62284205488265,
+      "fps": 543.8318255332118,
       "status": "PASS",
       "details": "MOTA=100.0%, IDSW=0, CosSim=0.976"
     },
@@ -31,9 +31,9 @@
       "mean_cos_sim": 0.975610296866123,
       "rmse": 0.7555353176649375,
       "mota": 1.0,
-      "fps": 2880.671775090325,
+      "fps": 3148.655919457721,
       "status": "PASS",
-      "details": "CRITICAL BUG: MOTA=100.0%, IDSW=0, FN=0 (Rust kernel fails on multi-target occlusion due to single partner limitation and missing coasting outputs)"
+      "details": "MOTA=100.0%, IDSW=0, CosSim=0.976"
     },
     {
       "scenario_id": "S1_baseline_diff_128",
@@ -46,7 +46,7 @@
       "mean_cos_sim": 0.25683874523191635,
       "rmse": 2.127901998257516,
       "mota": 0.0,
-      "fps": 933.6276331309217,
+      "fps": 1071.0216788408027,
       "status": "CONTROL_FAIL",
       "details": "Expected baseline failure: MOTA=0.0%, IDSW=77"
     },
@@ -61,7 +61,7 @@
       "mean_cos_sim": 1.0,
       "rmse": 4.990657937813761,
       "mota": 0.03125,
-      "fps": 6056.277962831308,
+      "fps": 6662.53959037305,
       "status": "CONTROL_FAIL",
       "details": "Expected baseline collapse: MOTA=3.1%, RMSE=4.99"
     },
@@ -76,7 +76,7 @@
       "mean_cos_sim": 0.9754097414501357,
       "rmse": 0.7086734960463781,
       "mota": 0.996875,
-      "fps": 256.5524292160289,
+      "fps": 285.2022119187552,
       "status": "FAIL",
       "details": "MOTA=99.7%, IDSW=1, CosSim=0.975"
     },
@@ -91,7 +91,7 @@
       "mean_cos_sim": 0.05721191515050877,
       "rmse": 2.0467475732423974,
       "mota": 0.0,
-      "fps": 305.90940490318593,
+      "fps": 299.59599480265877,
       "status": "CONTROL_FAIL",
       "details": "Expected baseline failure: MOTA=0.0%, IDSW=55"
     },
@@ -106,7 +106,7 @@
       "mean_cos_sim": 1.0,
       "rmse": 4.990657937813761,
       "mota": 0.03125,
-      "fps": 1880.400274229682,
+      "fps": 2139.7544981270157,
       "status": "CONTROL_FAIL",
       "details": "Expected baseline collapse: MOTA=3.1%, RMSE=4.99"
     },
@@ -121,7 +121,7 @@
       "mean_cos_sim": 0.9999999553185968,
       "rmse": 0.710122912291984,
       "mota": 1.0,
-      "fps": 617.6765119147008,
+      "fps": 666.9879326204721,
       "status": "PASS",
       "details": "MOTA=100.0%, IDSW=0, CosSim=1.000"
     },
@@ -136,7 +136,7 @@
       "mean_cos_sim": 0.9999998126414951,
       "rmse": 0.7104396145312181,
       "mota": 1.0,
-      "fps": 622.1275204683067,
+      "fps": 641.3454571481532,
       "status": "PASS",
       "details": "MOTA=100.0%, IDSW=0, CosSim=1.000"
     },
@@ -151,7 +151,7 @@
       "mean_cos_sim": 0.9999996504492957,
       "rmse": 0.7193357538680014,
       "mota": 1.0,
-      "fps": 530.9444373239962,
+      "fps": 676.7160887356479,
       "status": "PASS",
       "details": "MOTA=100.0%, IDSW=0, CosSim=1.000"
     },
@@ -166,7 +166,7 @@
       "mean_cos_sim": 0.9999998627049725,
       "rmse": 0.7097083577878742,
       "mota": 1.0,
-      "fps": 551.4432188146053,
+      "fps": 661.3228109203895,
       "status": "PASS",
       "details": "MOTA=100.0%, IDSW=0, CosSim=1.000"
     },
@@ -181,7 +181,7 @@
       "mean_cos_sim": 0.892886976225658,
       "rmse": 0.7057130749101768,
       "mota": 1.0,
-      "fps": 608.3128999938583,
+      "fps": 670.2047893263293,
       "status": "PASS",
       "details": "MOTA=100.0%, IDSW=0, CosSim=0.893"
     },
@@ -196,7 +196,7 @@
       "mean_cos_sim": 0.9999995393813575,
       "rmse": 0.7103696255267385,
       "mota": 1.0,
-      "fps": 589.0086566378021,
+      "fps": 672.131845291258,
       "status": "PASS",
       "details": "MOTA=100.0%, IDSW=0, CosSim=1.000"
     },
@@ -211,7 +211,7 @@
       "mean_cos_sim": 0.9519230519119395,
       "rmse": 0.7135979164927558,
       "mota": 0.9854166666666667,
-      "fps": 518.409700493415,
+      "fps": 529.649094323635,
       "status": "FAIL",
       "details": "MOTA=98.5%, IDSW=2, CosSim=0.952"
     },
@@ -226,7 +226,7 @@
       "mean_cos_sim": 0.636654141158321,
       "rmse": 0.7381063635056814,
       "mota": 0.9756944444444444,
-      "fps": 432.861316151985,
+      "fps": 448.4231201043011,
       "status": "FAIL",
       "details": "MOTA=97.6%, IDSW=9, CosSim=0.637"
     },
@@ -241,7 +241,7 @@
       "mean_cos_sim": 0.47041571590049636,
       "rmse": 1.2447838635082171,
       "mota": 0.9291666666666667,
-      "fps": 364.502554206917,
+      "fps": 272.2178541427238,
       "status": "FAIL",
       "details": "MOTA=92.9%, IDSW=38, CosSim=0.470"
     },
@@ -256,7 +256,7 @@
       "mean_cos_sim": 0.23075033666287373,
       "rmse": 0.7492726302144839,
       "mota": 0.9875,
-      "fps": 595.4359832334117,
+      "fps": 516.2159564161559,
       "status": "FAIL",
       "details": "Speed=0.15 px/frame, IDSW=1, PrePostMatch=False, RMSE=0.75"
     },
@@ -271,7 +271,7 @@
       "mean_cos_sim": 0.999999685623704,
       "rmse": 0.7102430305691855,
       "mota": 1.0,
-      "fps": 589.0053320422247,
+      "fps": 630.0598399396888,
       "status": "PASS",
       "details": "Speed=0.3 px/frame, IDSW=0, PrePostMatch=True, RMSE=0.71"
     },
@@ -286,7 +286,7 @@
       "mean_cos_sim": 0.9999999254355656,
       "rmse": 0.7102026631839934,
       "mota": 1.0,
-      "fps": 617.9927029650211,
+      "fps": 573.1988003076852,
       "status": "PASS",
       "details": "Speed=0.5 px/frame, IDSW=0, PrePostMatch=True, RMSE=0.71"
     },
@@ -301,7 +301,7 @@
       "mean_cos_sim": 0.9999981254033085,
       "rmse": 0.6920475600934032,
       "mota": 0.5583333333333333,
-      "fps": 572.3002391152787,
+      "fps": 638.2842918371617,
       "status": "PASS",
       "details": "Speed=1.0 px/frame, IDSW=0, PrePostMatch=True, RMSE=0.69"
     },
@@ -316,7 +316,7 @@
       "mean_cos_sim": 0.9999997644028102,
       "rmse": 0.7111684527515995,
       "mota": 0.2875,
-      "fps": 522.3646051843677,
+      "fps": 572.3377709033746,
       "status": "PASS",
       "details": "Speed=2.0 px/frame, IDSW=0, PrePostMatch=True, RMSE=0.71"
     },
@@ -331,7 +331,7 @@
       "mean_cos_sim": 0.9999999547902789,
       "rmse": 0.7165711128953259,
       "mota": 0.15416666666666667,
-      "fps": 499.31313236878515,
+      "fps": 562.760056618646,
       "status": "PASS",
       "details": "Speed=4.0 px/frame, IDSW=0, PrePostMatch=True, RMSE=0.72"
     },
@@ -346,7 +346,7 @@
       "mean_cos_sim": 0.999999864474797,
       "rmse": 0.7111862910476902,
       "mota": 0.7333333333333334,
-      "fps": 642.9181625450481,
+      "fps": 705.3460825535548,
       "status": "PASS",
       "details": "IDSW=0, PrePostMatch=True, MOTA=73.3%"
     },
@@ -361,7 +361,7 @@
       "mean_cos_sim": 0.9999995677374176,
       "rmse": 0.7108640614952454,
       "mota": 0.7489583333333334,
-      "fps": 407.33757542569555,
+      "fps": 602.4152332202806,
       "status": "PASS",
       "details": "IDSW=0, PrePostMatch=True, MOTA=74.9%"
     },
@@ -376,7 +376,7 @@
       "mean_cos_sim": 0.999999934419597,
       "rmse": 0.7216830278022075,
       "mota": 1.0,
-      "fps": 506.53610983299615,
+      "fps": 686.6785784834467,
       "status": "PASS",
       "details": "Overlap=1 frames, IDSW=0, PrePostMatch=True"
     },
@@ -391,7 +391,7 @@
       "mean_cos_sim": 0.999925077256937,
       "rmse": 0.8509156615083528,
       "mota": 0.9895833333333334,
-      "fps": 567.6675038394259,
+      "fps": 649.4819164120635,
       "status": "FAIL",
       "details": "Overlap=5 frames, IDSW=1, PrePostMatch=False"
     },
@@ -406,7 +406,7 @@
       "mean_cos_sim": 0.99984517695706,
       "rmse": 1.0511896196653103,
       "mota": 0.98125,
-      "fps": 615.2950032195475,
+      "fps": 692.4866068960005,
       "status": "FAIL",
       "details": "Overlap=10 frames, IDSW=1, PrePostMatch=False"
     },
@@ -421,7 +421,7 @@
       "mean_cos_sim": 0.7387198387678799,
       "rmse": 1.2349937093538679,
       "mota": 0.9583333333333334,
-      "fps": 607.2241456723015,
+      "fps": 618.7815675132745,
       "status": "FAIL",
       "details": "Overlap=15 frames, IDSW=3, PrePostMatch=False"
     },
@@ -436,7 +436,7 @@
       "mean_cos_sim": 0.5999526280297063,
       "rmse": 1.519938862344096,
       "mota": 0.9604166666666667,
-      "fps": 607.725251533401,
+      "fps": 707.4316282027735,
       "status": "FAIL",
       "details": "Overlap=20 frames, IDSW=1, PrePostMatch=False"
     },
@@ -451,7 +451,7 @@
       "mean_cos_sim": 0.9999999534669479,
       "rmse": 0.7072590423912393,
       "mota": 1.0,
-      "fps": 649.8733966718903,
+      "fps": 667.5015998256603,
       "status": "PASS",
       "details": "Single target: MOTA=100.0%, IDSW=0, RMSE=0.71"
     },
@@ -466,7 +466,7 @@
       "mean_cos_sim": 0.999998894048117,
       "rmse": 0.7172170640137803,
       "mota": 0.9270833333333334,
-      "fps": 537.72800506928,
+      "fps": 700.5662909727745,
       "status": "PASS",
       "details": "Co-linear overtaking: IDSW=0, PrePostMatch=True"
     },
@@ -481,7 +481,7 @@
       "mean_cos_sim": 0.9999999553185968,
       "rmse": 0.710122912291984,
       "mota": 1.0,
-      "fps": 586.6097525826684,
+      "fps": 683.6525848843893,
       "status": "PASS",
       "details": "Noise std=5.0: IDSW=0, MOTA=100.0%, RMSE=0.71"
     },
@@ -496,7 +496,7 @@
       "mean_cos_sim": 0.9153665450310878,
       "rmse": 0.8387456889506351,
       "mota": 0.0,
-      "fps": 440.59640600077904,
+      "fps": 481.5940763085107,
       "status": "FAIL",
       "details": "Noise std=10.0: IDSW=1, MOTA=0.0%, RMSE=0.84"
     },
@@ -511,7 +511,7 @@
       "mean_cos_sim": 0.9916324203486173,
       "rmse": 1.1204732516569507,
       "mota": 0.0,
-      "fps": 342.94934722222933,
+      "fps": 407.17455137590565,
       "status": "FAIL",
       "details": "Noise std=20.0: IDSW=5, MOTA=0.0%, RMSE=1.12"
     },
@@ -526,7 +526,7 @@
       "mean_cos_sim": 0.9581617638804192,
       "rmse": 1.4046703866879897,
       "mota": 0.0,
-      "fps": 326.5223936493804,
+      "fps": 387.42189615452696,
       "status": "FAIL",
       "details": "Noise std=30.0: IDSW=17, MOTA=0.0%, RMSE=1.40"
     },
@@ -541,7 +541,7 @@
       "mean_cos_sim": 0.32136522022405634,
       "rmse": 2.9827316361934013,
       "mota": 0.0,
-      "fps": 194.23546372100571,
+      "fps": 245.8863218302691,
       "status": "FAIL",
       "details": "Noise std=45.0: IDSW=96, MOTA=0.0%, RMSE=2.98"
     },
@@ -556,7 +556,7 @@
       "mean_cos_sim": 0.9999998666998462,
       "rmse": 0.7095712111027133,
       "mota": 1.0,
-      "fps": 580.4297936962811,
+      "fps": 700.5082188720997,
       "status": "PASS",
       "details": "Intensity asymmetry: IDSW=0, PrePostMatch=True"
     },
@@ -571,7 +571,7 @@
       "mean_cos_sim": 0.9999999512435241,
       "rmse": 0.7097992638291309,
       "mota": 1.0,
-      "fps": 597.7750810475344,
+      "fps": 694.953192134186,
       "status": "PASS",
       "details": "Vanishing target: IDSW=0, PrePostMatch=True"
     }
