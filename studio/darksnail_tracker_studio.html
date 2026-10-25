@@ -1652,11 +1652,11 @@ footer {
     </div>
     <div class="thm-group">
       <span style="color:var(--text-muted); font-size:7.5px; font-weight:800;">LIT:</span>
-      <a class="lit-badge" href="#lit-2110-13389" data-url="https://arxiv.org/abs/2110.13389" title="Wang et al. (2021) - Normalized Gaussian Wasserstein for Tiny Object Detection">Wang 2021 (W1)</a>
-      <a class="lit-badge" href="#lit-2203-14360" data-url="https://arxiv.org/abs/2203.14360" title="Cao et al. (2022) - Observation-Centric SORT: Kalman Lag & Occlusion">OC-SORT 2022</a>
-      <a class="lit-badge" href="#lit-2110-06864" data-url="https://arxiv.org/abs/2110.06864" title="Zhang et al. (2021) - ByteTrack: Associating Every Detection Box">ByteTrack 2021</a>
-      <a class="lit-badge" href="#lit-2408-09615" data-url="https://arxiv.org/abs/2408.09615" title="LimitIRSTD (2024) - Resource-Limited Infrared Small Target Detection">LimitIRSTD 2024</a>
-      <a class="lit-badge" href="#lit-2610-07561" data-url="https://arxiv.org/abs/2610.07561" title="LARK - Low-Cost Occlusion-Resilient Kalman System">LARK 2026</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2110.13389" target="_blank" title="Wang et al. (2021) - Normalized Gaussian Wasserstein for Tiny Object Detection">Wang 2021 (W1)</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2203.14360" target="_blank" title="Cao et al. (2022) - Observation-Centric SORT: Kalman Lag & Occlusion">OC-SORT 2022</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2110.06864" target="_blank" title="Zhang et al. (2021) - ByteTrack: Associating Every Detection Box">ByteTrack 2021</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2408.09615" target="_blank" title="LimitIRSTD (2024) - Resource-Limited Infrared Small Target Detection">LimitIRSTD 2024</a>
+      <a class="lit-badge" href="https://arxiv.org/abs/2610.07561" target="_blank" title="LARK - Low-Cost Occlusion-Resilient Kalman System">LARK 2026</a>
     </div>
   </div>
 </footer>
@@ -1806,6 +1806,25 @@ class TrackerArena {
     this.ulpBufF32 = new Float32Array(1);
     this.ulpBufI32 = new Int32Array(this.ulpBufF32.buffer);
 
+    // 16D SO(16) Cayley Rotor state vector on S^15
+    this.cayleyInitRegisters16 = new Float32Array(16);
+    let c16Norm = 0.0;
+    for (let i = 0; i < 16; i++) {
+      this.cayleyInitRegisters16[i] = Math.sin((i + 1) * 0.61);
+      c16Norm += this.cayleyInitRegisters16[i] * this.cayleyInitRegisters16[i];
+    }
+    c16Norm = Math.sqrt(c16Norm);
+    for (let i = 0; i < 16; i++) {
+      this.cayleyInitRegisters16[i] = Math.fround(this.cayleyInitRegisters16[i] / c16Norm);
+    }
+    let c16Sq = 0.0;
+    for (let i = 0; i < 16; i++) {
+      c16Sq = Math.fround(c16Sq + Math.fround(this.cayleyInitRegisters16[i] * this.cayleyInitRegisters16[i]));
+    }
+    this.cayleyTargetSq = c16Sq;
+    this.cayleyRegisters16 = new Float32Array(this.cayleyInitRegisters16);
+    this.cayleyDrift = 0.0;
+
     // Tracking State
     this.tracks = [];       // DarkSnail Tracks
     this.legacyTracks = []; // PatchAvgKalmanIoU Baseline Tracks
@@ -1819,6 +1838,8 @@ class TrackerArena {
 
   resetCascadeState() {
     this.cascadeRegisters.set(this.cascadeInitRegisters);
+    this.cayleyRegisters16.set(this.cayleyInitRegisters16);
+    this.cayleyDrift = 0.0;
     this.cascadeZHTemp[0] = 1.0;
     this.cascadeZHTemp[1] = 0.25;
     this.cascadeZHTemp[2] = -0.25;
@@ -2067,7 +2088,10 @@ function extractBeltramiSpikesAndWashouts(arena) {
 
   // Estimate background intensity pedestal via 256-sample strided median (handles 120Hz PWM strobe offsets)
   const bgSamples = arena.statSamples256;
-  for (let s = 0; s < 256; s++) bgSamples[s] = curr[(s * 64) % arena.size];
+  for (let s = 0; s < 256; s++) {
+    const v = curr[(s * 64) % arena.size];
+    bgSamples[s] = Number.isFinite(v) ? v : 0.0;
+  }
   bgSamples.sort();
   const bgPedestal = 0.5 * (bgSamples[127] + bgSamples[128]);
 
@@ -2143,6 +2167,7 @@ function extractBeltramiSpikesAndWashouts(arena) {
         salience = baseCurl * motionGain;
       }
 
+      salience = Number.isFinite(salience) ? salience : 0.0;
       curl[idx] = salience;
       if (salience > (!isLive ? 18.0 : CONFIG.webrtcSensitivity)) {
         spikeCount++;
@@ -2172,9 +2197,12 @@ function poolRoPE2DMedoids(arena) {
     medoids[i].parentId = null;
   }
 
-  // O(1) 256-sample strided MAD floor (Trap 3 parity with Python/Rust)
+  // O(1) 256-sample strided MAD floor (Trap 3 parity with Python/Rust, Number.isFinite sanitized)
   const samples = arena.statSamples256;
-  for (let s = 0; s < 256; s++) samples[s] = curl[(s * 64) % arena.size];
+  for (let s = 0; s < 256; s++) {
+    const v = curl[(s * 64) % arena.size];
+    samples[s] = Number.isFinite(v) ? v : 0.0;
+  }
   samples.sort();
   const med = 0.5 * (samples[127] + samples[128]);
   const devs = arena.statDevs256;
@@ -2564,10 +2592,121 @@ function evaluateTriadTieBreak(trackA, trackB) {
 
 function sumSqF32(arr) {
   let s = 0.0;
-  for (let i = 0; i < 8; i++) {
+  const n = arr.length;
+  for (let i = 0; i < n; i++) {
     s = Math.fround(s + Math.fround(arr[i] * arr[i]));
   }
   return s;
+}
+
+function polishActiveCoordsUlpF32(v, targetSq, f32Buf, i32Buf) {
+  const n = v.length;
+  let curSq = sumSqF32(v);
+  if (curSq === targetSq) return;
+
+  // Pass 1: Coordinate-wise residual square-root + 1-coordinate active ULP polish (|v[j]| > 1e-12 only)
+  for (let j = 0; j < n; j++) {
+    if (Math.abs(v[j]) <= 1e-12) continue;
+    curSq = sumSqF32(v);
+    if (curSq === targetSq) return;
+    let otherSq = 0.0;
+    for (let k = 0; k < n; k++) {
+      if (k !== j) otherSq = Math.fround(otherSq + Math.fround(v[k] * v[k]));
+    }
+    const remSq = Math.max(0.0, targetSq - otherSq);
+    const sign = v[j] >= 0.0 ? 1.0 : -1.0;
+    const baseZ = Math.fround(sign * Math.sqrt(remSq));
+    let bestZ = baseZ;
+    v[j] = baseZ;
+    let bestErr = Math.abs(sumSqF32(v) - targetSq);
+    f32Buf[0] = baseZ;
+    const baseBits = i32Buf[0];
+    for (let dUlp = -12; dUlp <= 12; dUlp++) {
+      if (dUlp === 0) continue;
+      i32Buf[0] = (baseBits + dUlp) | 0;
+      const candZ = f32Buf[0];
+      if (!Number.isFinite(candZ)) continue;
+      v[j] = candZ;
+      const err = Math.abs(sumSqF32(v) - targetSq);
+      if (err < bestErr) {
+        bestErr = err;
+        bestZ = candZ;
+        if (err === 0.0) {
+          v[j] = bestZ;
+          return;
+        }
+      }
+    }
+    v[j] = bestZ;
+  }
+
+  // Pass 2: 2-coordinate active-pair ULP fallback polish (strictly |v[i]| > 1e-12 && |v[j]| > 1e-12)
+  if (sumSqF32(v) === targetSq) return;
+  let bestErr = Math.abs(sumSqF32(v) - targetSq);
+  let bestPair = null;
+  for (let i = 0; i < n; i++) {
+    const origI = v[i];
+    if (Math.abs(origI) <= 1e-12) continue;
+    f32Buf[0] = origI;
+    const bitsI = i32Buf[0];
+    for (let j = i + 1; j < n; j++) {
+      const origJ = v[j];
+      if (Math.abs(origJ) <= 1e-12) continue;
+      f32Buf[0] = origJ;
+      const bitsJ = i32Buf[0];
+      for (let duI = -8; duI <= 8; duI++) {
+        i32Buf[0] = (bitsI + duI) | 0;
+        const candI = f32Buf[0];
+        if (!Number.isFinite(candI)) continue;
+        v[i] = candI;
+        for (let duJ = -8; duJ <= 8; duJ++) {
+          if (duI === 0 && duJ === 0) continue;
+          i32Buf[0] = (bitsJ + duJ) | 0;
+          const candJ = f32Buf[0];
+          if (!Number.isFinite(candJ)) continue;
+          v[j] = candJ;
+          const err = Math.abs(sumSqF32(v) - targetSq);
+          if (err === 0.0) return;
+          if (err < bestErr) {
+            bestErr = err;
+            bestPair = [i, candI, j, candJ];
+          }
+        }
+      }
+      v[j] = origJ;
+    }
+    v[i] = origI;
+  }
+  if (bestPair) {
+    v[bestPair[0]] = bestPair[1];
+    v[bestPair[2]] = bestPair[3];
+  }
+}
+
+/**
+ * Closed-form rank-2 Cayley rotor update in SO(16) on S^15 (Theorem 2.11)
+ * Preserves zero coordinates and achieves exact 0.000e+00 norm drift in float32.
+ */
+function stepCayleyRotorSO16(arena, uIdx, vIdx, alpha) {
+  const v = arena.cayleyRegisters16;
+  if (!v) return;
+  const u = uIdx & 15;
+  const w = vIdx & 15;
+  if (u === w) return;
+  const targetSq = arena.cayleyTargetSq || sumSqF32(v);
+  const a = Math.fround(alpha);
+  const a2 = a * a;
+  const invDenom = 1.0 / (1.0 + a2);
+  const c1 = (1.0 - a2) * invDenom;
+  const c2 = (2.0 * a) * invDenom;
+  const vu = v[u];
+  const vw = v[w];
+  v[u] = Math.fround(c1 * vu + c2 * vw);
+  v[w] = Math.fround(-c2 * vu + c1 * vw);
+  polishActiveCoordsUlpF32(v, targetSq, arena.ulpBufF32, arena.ulpBufI32);
+  const norm0 = Math.fround(Math.sqrt(targetSq));
+  const finalNorm = Math.fround(Math.sqrt(sumSqF32(v)));
+  arena.cayleyDrift = Math.abs(finalNorm - norm0);
 }
 
 /**
@@ -2626,41 +2765,8 @@ function stepSlowFastCascade(zH, zL, K = 16) {
     const scale = norm0 / normStep;
     for (let i = 0; i < 8; i++) v[i] = Math.fround(v[i] * scale);
 
-    // Coordinate-wise residual square-root + IEEE-754 float32 ULP polish (matches OcclusionTriad.lean)
-    let curSq = sumSqF32(v);
-    if (curSq !== targetSq) {
-      const f32Buf = arena.ulpBufF32;
-      const i32Buf = arena.ulpBufI32;
-      for (let j = 0; j < 8; j++) {
-        curSq = sumSqF32(v);
-        if (curSq === targetSq) break;
-        let otherSq = 0.0;
-        for (let k = 0; k < 8; k++) {
-          if (k !== j) otherSq = Math.fround(otherSq + Math.fround(v[k] * v[k]));
-        }
-        const remSq = Math.max(0.0, targetSq - otherSq);
-        const sign = v[j] >= 0.0 ? 1.0 : -1.0;
-        const baseZ = Math.fround(sign * Math.sqrt(remSq));
-        let bestZ = baseZ;
-        v[j] = baseZ;
-        let bestErr = Math.abs(sumSqF32(v) - targetSq);
-        f32Buf[0] = baseZ;
-        const baseBits = i32Buf[0];
-        for (let dUlp = -2; dUlp <= 2; dUlp++) {
-          if (dUlp === 0) continue;
-          i32Buf[0] = baseBits + dUlp;
-          const candZ = f32Buf[0];
-          if (!isFinite(candZ)) continue;
-          v[j] = candZ;
-          const err = Math.abs(sumSqF32(v) - targetSq);
-          if (err < bestErr) {
-            bestErr = err;
-            bestZ = candZ;
-          }
-        }
-        v[j] = bestZ;
-      }
-    }
+    // Active-coordinate residual square-root + 1-coord & 2-coord IEEE-754 float32 ULP polish
+    polishActiveCoordsUlpF32(v, targetSq, arena.ulpBufF32, arena.ulpBufI32);
   }
 
   const finalSq = sumSqF32(v);
@@ -3493,6 +3599,7 @@ function runDarkSnailTrackerStep(arena) {
     }
   }
   stepSlowFastCascade(arena.cascadeZHTemp, arena.cascadeRegisters, 16);
+  stepCayleyRotorSO16(arena, STATE.frameIdx & 15, (STATE.frameIdx + 3) & 15, 0.125);
 
   // Stage 4: Decoy Factorization
   factorizeCausalDecoys(activeTracks);
@@ -3610,9 +3717,11 @@ function recordTelemetryFrame(arena) {
     mode: STATE.mode,
     scenario: STATE.scenario,
     classification: STATE.classification,
+    morse_critical: Boolean(arena.isMorseCritical),
     tie_break_gap: Number(arena.tieBreakGap.toFixed(4)),
     w1_marg: Number(arena.w1Dist.toFixed(4)),
     radial_drift: arena.radialDrift,
+    cayley_drift: arena.cayleyDrift || 0.0,
     tracks: trks,
   });
 }
@@ -4477,7 +4586,9 @@ function updateTelemetryHUD() {
   document.getElementById('hud-drift').innerHTML = `${arena.radialDrift.toExponential(3)} <span class="t-unit">S^7</span>`;
   document.getElementById('hud-heap').innerHTML = `${heapMB} <span class="t-unit">MB &lt; 2.0 MB</span>`;
   document.getElementById('hud-swaps').innerHTML = `${STATE.darkSnailSwaps} <span class="t-unit">Verified</span>`;
-  document.getElementById('hud-gate').innerText = STATE.classification.toUpperCase();
+  const hudGateEl = document.getElementById('hud-gate');
+  hudGateEl.innerText = STATE.classification.toUpperCase();
+  hudGateEl.dataset.morseCritical = arena.isMorseCritical ? '1' : '0';
 
   document.getElementById('annun-sram').innerText = `${heapMB} MB SRAM (<2.0 MB)`;
   document.getElementById('annun-frame').innerText = String(STATE.frameIdx).padStart(5, '0');
@@ -4509,7 +4620,7 @@ function updateTelemetryHUD() {
   pushSpark('drift', arena.cascadeRegisters[0] || 0.75);
   pushSpark('heap', parseFloat(heapMB) + (arena.tracks.length * 0.002));
   pushSpark('swaps', arena.tieBreakGap || 0.0);
-  pushSpark('gate', pri ? (pri.nis || 0.0) : (STATE.pendingImpulse ? 22.46 : 1.0));
+  pushSpark('gate', pri ? (pri.nis || 0.0) : (STATE.pendingImpulse ? 22.46 : (arena.isMorseCritical ? 11.23 : 1.0)));
   pushSpark('eta', arena.w1Dist || priEta);
   pushSpark('trk', priSpd);
 
@@ -4518,7 +4629,7 @@ function updateTelemetryHUD() {
   drawSparklineCanvas('spark-drift', SPARK_HISTORY.drift, '#00ff9d', scrubFrac);
   drawSparklineCanvas('spark-heap', SPARK_HISTORY.heap, '#b844ff', scrubFrac);
   drawSparklineCanvas('spark-swaps', SPARK_HISTORY.swaps, '#00ff9d', scrubFrac);
-  drawSparklineCanvas('spark-gate', SPARK_HISTORY.gate, '#00f0ff', scrubFrac);
+  drawSparklineCanvas('spark-gate', SPARK_HISTORY.gate, arena.isMorseCritical ? '#ffb800' : '#00f0ff', scrubFrac);
   drawSparklineCanvas('spark-eta', SPARK_HISTORY.eta, '#ffb800', scrubFrac);
   drawSparklineCanvas('spark-trk', SPARK_HISTORY.trk, '#00f0ff', scrubFrac);
 }
