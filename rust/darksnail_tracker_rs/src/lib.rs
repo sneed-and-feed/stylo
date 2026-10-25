@@ -34,6 +34,10 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 pub extern "C" fn rust_eh_personality() {}
 
+#[cfg(all(not(feature = "std"), not(test), target_os = "macos"))]
+#[link(name = "System")]
+extern "C" {}
+
 #[cfg(any(feature = "std", test))]
 extern crate std;
 
