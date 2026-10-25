@@ -1,144 +1,112 @@
-import Formalization.Analysis.TriadConservation
-import Formalization.Analysis.RoPECoherence
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
 import Mathlib.Tactic
 
 /-!
-# Project DarkSnail: Skew-Symmetric Color-Occlusion Triad & 2D Axial RoPE Coherence
+# TriadCore: Standalone Proof-Carrying Core Primitives (Theorems 2.1–2.11)
 
-This module formalizes the core mathematical synthesis of **Project DarkSnail**
-(System 2 Ultrametric & Continuous-Time Triad Reasoning on ARC-AGI):
+This module formalizes the machine-checked mathematical core of `sneed-and-feed/triad-core`,
+unifying the six fundamental primitives shared across the DarkSnail constellation:
 
-1. **Skew-Symmetric Color-Occlusion Antisymmetry (`skew_triad_swap_neg`)**:
-   For the skew-symmetrized color-occlusion interaction tensor
-   $$S(W, i, c_1, c_2) = W(i, c_1, c_2) - W(i, c_2, c_1),$$
-   swapping competing foreground colors $c_1 \leftrightarrow c_2$ strictly negates the interaction
-   ($S(W, i, c_2, c_1) = -S(W, i, c_1, c_2)$) and self-interaction vanishes identically
-   ($S(W, i, c, c) = 0$).
-
-2. **Exact Tie-Breaking of Symmetric Readout Collisions (`occlusion_triad_breaks_symmetric_tie`)**:
-   Whereas any additive or symmetric readout $\ell_{\mathrm{sym}}(c_1) = \ell_{\mathrm{sym}}(c_2)$
-   cannot distinguish which of two colliding foreground colors $c_1, c_2$ occludes the other at a
-   shared pixel, the DarkSnail bilinear triad readout shift
-   $$\ell_{\mathrm{post}}(k) = \ell_{\mathrm{sym}}(k) + B_W(u, v)_k$$
-   produces an exact antisymmetric margin
-   $$\ell_{\mathrm{post}}(c_1) - \ell_{\mathrm{post}}(c_2)
-     = 2 \beta \alpha \bigl(W(i_0, c_2, c_1) - W(i_0, c_1, c_2)\bigr),$$
-   strictly breaking the 2-color occlusion tie whenever $W(i_0, c_2, c_1) > W(i_0, c_1, c_2)$.
-
-3. **Zero-Energy-Explosion Orthogonality (`darksnail_readout_energy_conservation`)**:
-   By `triad_pointwise_orthogonal`, the DarkSnail triad logit shift is strictly orthogonal to the
-   active color probability state $v$ ($\langle v, B_W(u, v) \rangle = 0$), and the Slow-Fast
-   ($z_H \to z_L$) recurrent triad pump $\dot{z}_L = B_{W_{\mathrm{rec}}}(z_H, z_L)$ has zero
-   radial energy growth ($\langle z_L, \dot{z}_L \rangle = 0$).
-
-4. **Step-0 System 1 Homotopy Equivalence (`darksnail_step0_system1_homotopy`)**:
-   At the Step-0 initialization ($\Delta_{\mathrm{sym}} = 0$, $W = 0$), the full DarkSnail readout
-   reduces identically to the pretrained System 1 baseline logit $\ell_{\mathrm{S1}}(k)$.
-
-5. **2D Axial RoPE Medoid Invariance & Patch-Averaging Attenuation
-   (`rope2d_medoid_relative_invariance`, `rope2d_arithmetic_norm_lt`)**:
-   In 2D grid coordinates $(y, x)$, selecting a 2D medoid key preserves exact relative 2D
-   rotational displacement $(y^* - y_q, x^* - x_q)$ across both vertical and horizontal axes,
-   whereas arithmetic patch averaging across distinct 2D grid phases strictly attenuates the
-   squared 2D key norm.
-
-6. **Multi-Step Unrolled Slow-Fast Spherical Invariance & Step-0 Homotopy
-   (`darksnail_multistep_spherical_invariance`, `darksnail_multistep_step0_homotopy`)**:
-   Across any $T$-step unrolled Slow-Fast spherical triad cascade, the terminal retracted state
-   preserves the exact initial squared Euclidean norm and reduces identically to the unmodified
-   System 1 trajectory at $W_{\mathrm{rec}} = 0$.
-
-7. **SO(6) Kelvin-Mandel Stiffness Rotor Conservation & Caliper Morse Shielding
-   (`kelvinMandelDipRotor_orthonormal`, `elasticEnergy6_rotateStiffness6`,
-   `so6_stiffness_preserves_pos_def`, `so6_stiffness_trace_conservation`,
-   `morseImpulse_iff_strict_extremum`, `caliper_morse_rejects_washout_step`,
-   `caliper_morse_shields_thin_stringer`)**:
-   Connecting Project DarkSnail to 3D anisotropic subsurface velocity modeling (`g3vm`),
-   6D Kelvin-Mandel orthogonal stiffness rotors preserve elastic strain energy, strict
-   positive-definiteness (coercivity), and tensor trace across tilted strata, while the 3-point
-   discrete Morse critical-point impulse filter strictly rejects single-sided caliper washout steps
-   and monotone compaction ramps while recovering thin-bed stringer spikes at 100% amplitude.
-
-8. **3D Ideal MHD / Stellarator Symmetry-Breaking Isomorphism
-   (`cross3_eq_triadOperator`, `mhd_euler_force_balance_bijection`,
+1. **Theorem 2.1 (`skew_triad_swap_neg`, `skew_triad_self_zero`)**:
+   $\mathfrak{so}(C)$ Skew-Symmetric Bilinear Triad antisymmetry and vanishing self-interaction.
+2. **Theorem 2.2 (`occlusion_triad_breaks_symmetric_tie`)**:
+   Exact tie-breaking of symmetric 2-color collision readouts via bilinear triad shift.
+3. **Theorem 2.3 (`darksnail_readout_energy_conservation`)**:
+   Pointwise zero-energy-explosion orthogonality: $\langle v, B_W(u, v) \rangle = 0$.
+4. **Theorem 2.4 (`darksnail_step0_system1_homotopy`)**:
+   Step-0 System 1 homotopy equivalence: full readout reduces identically to baseline.
+5. **Theorem 2.5 (`rope2d_medoid_relative_invariance`, `rope2d_arithmetic_norm_lt`)**:
+   2D Axial RoPE medoid relative displacement invariance and strict patch-averaging attenuation.
+6. **Theorem 2.6 (`darksnail_multistep_spherical_invariance`, `darksnail_multistep_step0_homotopy`)**:
+   Multi-step unrolled Slow-Fast spherical cascade norm invariance ($0.000\mathrm{e}{+}00$ drift).
+7. **Theorem 2.7 (`elasticEnergy6_rotateStiffness6`, `so6_stiffness_preserves_pos_def`,
+   `so6_stiffness_trace_conservation`, `morseImpulse_iff_strict_extremum`,
+   `caliper_morse_rejects_washout_step`, `caliper_morse_shields_thin_stringer`)**:
+   $\mathrm{SO}(6)$ Kelvin-Mandel stiffness rotor trace/energy conservation and discrete Morse shielding.
+8. **Theorem 2.8 (`cross3_eq_triadOperator`, `mhd_euler_force_balance_bijection`,
    `mhd_flux_surface_confinement_iff`, `stellarator_parity_breaks_tie_and_conserves_flux`,
    `stellarator_zero_torsion_homotopy_iff`)**:
-   Establishes the exact isomorphism between the $C = 3$ Levi-Civita instance of `triadOperator`
-   and the 3D cross product, proving the involutive force-balance bijection between 3D ideal MHD
-   ($\mathbf{J} \times \mathbf{B} = \nabla p$) and steady Euler/Beltrami hydrodynamics
-   ($\boldsymbol{\omega} \times \mathbf{u} = -\nabla H$), tangent magnetic flux-surface confinement
-   ($\mathbf{B} \cdot \nabla\psi = 0 \iff \langle v, B_W(u, v) \rangle = 0$), non-stellarator-symmetric
-   parity tie-breaking across resonant Fourier modes, and exact zero-torsion homotopy
-   ($\tau_0 = 0 \iff \delta z = 0$).
-
-9. **Relaxed-Flow MRxMHD Bernoulli Jump & Cross-Helicity Collinearity
-   (`flowBeltramiMultiplier`, `sub_alfvenic_beltrami_homotopy_zero_flow`,
-   `beltrami_cross_helicity_collinear_lorentz_vanishes`,
-   `mrxmhd_flow_bernoulli_jump_conservation`, `kam_sub_alfvenic_ellipticity_and_gap`)**:
-   Extends static Taylor-Woltjer Beltrami relaxation to Multi-Region Relaxed MHD (MRxMHD) with
-   sub-Alfvénic field-aligned plasma flow $M_i^2 < 1$ (Qu et al., 2020/2021), proving exact
-   vanishing of the interior Lorentz/Lamb triad for collinear Beltrami fields, the generalized
-   Flow-MRxMHD Bernoulli interface jump law $\llbracket p + \frac{1}{2}(1 + M^2) B^2 \rrbracket = 0$
-   with exact static Taylor-Hudson reduction at $M = 0$, and sub-Alfvénic PDE ellipticity paired
-   with KAM Diophantine interface non-resonance.
+   3D Ideal MHD $\leftrightarrow$ Euler force balance bijection and tangent flux confinement.
+9. **Theorem 2.9 (`sub_alfvenic_beltrami_homotopy_zero_flow`, `sub_alfvenic_beltrami_pos`,
+   `beltrami_cross_helicity_collinear_lorentz_vanishes`, `mrxmhd_flow_bernoulli_jump_conservation`,
+   `kam_sub_alfvenic_ellipticity_and_gap`)**:
+   Relaxed-Flow MRxMHD Bernoulli jump law and collinear Beltrami Lorentz vanishing.
+10. **Theorem 2.10a (`cayley_rank2_orthogonality` / `cayley_rotor_orthogonality`)**:
+    Online Rank-2 $\mathfrak{so}(n)$ Cayley transform rotor column-orthonormality $R^\top R = I_n$
+    and Euclidean vector norm preservation $\|R x\|^2 = \|x\|^2$.
+11. **Theorem 2.10b (`contact_sheaf_non_penetration_invariant` / `contact_sheaf_unilateral_non_penetration`)**:
+    $\mathrm{SE}(2)$ Contact Sheaf normal coboundary condition $(\delta v)_n(e) \ge 0$ unilateral
+    non-penetration guarantee with unconstrained tangential sliding freedom.
+12. **Theorem 2.11 (`sram_arena_layout_verified` / `sram_arena_cacheline_disjoint_and_bounded`)**:
+    Broadcom BCM2712 SRAM `TriadUniversalArena` 64-byte cache-line alignment, pairwise
+    sub-buffer disjointness, and strict $\le 1,258,291\text{ B} < 2.0\text{ MB}$ memory ceiling.
 -/
 
-namespace Ultrametric.Analysis.OcclusionTriad
+namespace TriadCore
 
 open scoped BigOperators
 open Real Finset
 
-/-- Explicit-dimension wrapper around `Formalization.Analysis.triadOperator`:
-$$B_W(u, v)_k = \sum_{i, j \in \mathrm{Fin}\,C} u_i v_j (W_{i,j,k} - W_{i,k,j}).$$ -/
-def triadOperator (C : ℕ) (W : Fin C → Fin C → Fin C → ℝ)
-    (u v : Fin C → ℝ) (k : Fin C) : ℝ :=
-  Formalization.Analysis.triadOperator W u v k
+/-! ### Foundational Definitions: Bilinear Triad Operator & Shell Energy -/
 
-/-- Skew-symmetrized color-occlusion interaction tensor
-$$S(W, i, c_1, c_2) = W(i, c_1, c_2) - W(i, c_2, c_1)$$
-representing the directed occlusion dominance of color $c_2$ over $c_1$ under structural mode $i$. -/
+/-- Skew-symmetrized bilinear triad operator:
+$$B_W(u, v)_k = \sum_{i, j \in \mathrm{Fin}\,M} u_i v_j (W_{i,j,k} - W_{i,k,j}).$$ -/
+def triadOperator {M : ℕ} (W : Fin M → Fin M → Fin M → ℝ)
+    (u v : Fin M → ℝ) (k : Fin M) : ℝ :=
+  ∑ i : Fin M, ∑ j : Fin M, u i * v j * (W i j k - W i k j)
+
+/-- Standard Euclidean inner product on $\mathbb{R}^M$. -/
+def shellInner {M : ℕ} (x y : Fin M → ℝ) : ℝ :=
+  ∑ k : Fin M, x k * y k
+
+/-- Squared Euclidean norm $\|x\|_2^2 = \langle x, x \rangle$ on $\mathbb{R}^M$. -/
+def shellEnergy {M : ℕ} (x : Fin M → ℝ) : ℝ :=
+  shellInner x x
+
+/-- Pointwise orthogonality $\langle v, B_W(u, v) \rangle = 0$. -/
+theorem triad_pointwise_orthogonal {M : ℕ} (W : Fin M → Fin M → Fin M → ℝ)
+    (u v : Fin M → ℝ) :
+    shellInner v (triadOperator W u v) = 0 := by
+  unfold shellInner triadOperator
+  simp_rw [mul_sum]; rw [sum_comm]
+  refine sum_eq_zero fun i _ => ?_
+  simp_rw [mul_sub, sum_sub_distrib, sub_eq_zero]
+  rw [sum_comm]
+  exact sum_congr rfl fun j _ => sum_congr rfl fun k _ => by ring
+
+/-! ### Theorem 2.1: Skew-Symmetric Color-Occlusion Antisymmetry -/
+
+/-- Directed interaction tensor $S(W, i, c_1, c_2) = W(i, c_1, c_2) - W(i, c_2, c_1)$. -/
 def skewTriad {C : ℕ} (W : Fin C → Fin C → Fin C → ℝ) (i c₁ c₂ : Fin C) : ℝ :=
   W i c₁ c₂ - W i c₂ c₁
 
-/-! ### Theorem 1: Skew-Symmetric Color-Occlusion Antisymmetry -/
-
-/-- **Theorem 1 (`skew_triad_swap_neg`)**:
-For the skew-symmetrized color-occlusion interaction $S(W, i, c_1, c_2) = W(i, c_1, c_2) - W(i, c_2, c_1)$,
-swapping $c_1 \leftrightarrow c_2$ negates the interaction:
+/-- **Theorem 2.1 (`skew_triad_swap_neg`)**:
+Swapping competing colors strictly negates directed interaction:
 $$S(W, i, c_2, c_1) = -S(W, i, c_1, c_2),$$
-and self-interaction vanishes identically:
-$$S(W, i, c_1, c_1) = 0.$$ -/
+and self-interaction vanishes identically: $S(W, i, c, c) = 0$. -/
 theorem skew_triad_swap_neg {C : ℕ} (W : Fin C → Fin C → Fin C → ℝ) (i c₁ c₂ : Fin C) :
     skewTriad W i c₂ c₁ = -skewTriad W i c₁ c₂ ∧ skewTriad W i c₁ c₁ = 0 := by
   unfold skewTriad; constructor <;> ring
 
-/-- Self-occlusion interaction vanishes for any color $c$. -/
 theorem skew_triad_self_zero {C : ℕ} (W : Fin C → Fin C → Fin C → ℝ) (i c : Fin C) :
     skewTriad W i c c = 0 :=
   (skew_triad_swap_neg W i c c).2
 
-/-! ### Theorem 2: Exact Tie-Breaking of Symmetric 2-Color Collisions -/
+/-! ### Theorem 2.2: Exact Tie-Breaking of Symmetric Readout Collisions -/
 
-/-- DarkSnail post-readout logit combining a symmetric/additive baseline logit $\ell_{\mathrm{sym}}$
-with the skew-symmetric bilinear triad shift $B_W(u, v)$. -/
+/-- Post-readout logit combining symmetric baseline $\ell_{\mathrm{sym}}$ and triad shift. -/
 def postLogit (C : ℕ) (ℓ_sym : Fin C → ℝ) (W : Fin C → Fin C → Fin C → ℝ)
     (u v : Fin C → ℝ) (k : Fin C) : ℝ :=
-  ℓ_sym k + triadOperator C W u v k
+  ℓ_sym k + triadOperator W u v k
 
-/-- Helper lemma: evaluation of `triadOperator` under a single active structural mode $u(i_0) = \beta$
-and a 2-color collision state $v(c_1) = v(c_2) = \alpha$ (with $c_1 \neq c_2$). -/
 lemma triadOperator_two_color_eval {C : ℕ} (W : Fin C → Fin C → Fin C → ℝ)
-    (u v : Fin C → ℝ) (i₀ c₁ c₂ k : Fin C) (α β : ℝ)
-    (hc : c₁ ≠ c₂)
-    (hu_i0 : u i₀ = β)
-    (hu_other : ∀ i : Fin C, i ≠ i₀ → u i = 0)
-    (hv_c1 : v c₁ = α)
-    (hv_c2 : v c₂ = α)
+    (u v : Fin C → ℝ) (i₀ c₁ c₂ k : Fin C) (α β : ℝ) (hc : c₁ ≠ c₂)
+    (hu_i0 : u i₀ = β) (hu_other : ∀ i : Fin C, i ≠ i₀ → u i = 0)
+    (hv_c1 : v c₁ = α) (hv_c2 : v c₂ = α)
     (hv_other : ∀ c : Fin C, c ≠ c₁ → c ≠ c₂ → v c = 0) :
-    triadOperator C W u v k =
+    triadOperator W u v k =
       β * α * (W i₀ c₁ k - W i₀ k c₁) + β * α * (W i₀ c₂ k - W i₀ k c₂) := by
-  unfold triadOperator Formalization.Analysis.triadOperator
+  unfold triadOperator
   rw [Finset.sum_eq_single i₀]
   · rw [← Finset.add_sum_erase _ _ (Finset.mem_univ c₁),
         ← Finset.add_sum_erase _ _ (Finset.mem_erase.mpr ⟨hc.symm, Finset.mem_univ c₂⟩),
@@ -149,25 +117,17 @@ lemma triadOperator_two_color_eval {C : ℕ} (W : Fin C → Fin C → Fin C → 
   · exact fun i _ hi => Finset.sum_eq_zero fun j _ => by simp [hu_other i hi]
   · exact fun h => (h (Finset.mem_univ i₀)).elim
 
-/-- **Theorem 2 (`occlusion_triad_breaks_symmetric_tie`)**:
-Let $\ell_{\mathrm{sym}} : \mathrm{Fin}\,C \to \mathbb{R}$ be any symmetric/additive readout logit vector
-that ties on two competing foreground colors $c_1, c_2$ ($\ell_{\mathrm{sym}}(c_1) = \ell_{\mathrm{sym}}(c_2)$).
-In a 2-color collision state $v(c_1) = v(c_2) = \alpha > 0$ (and $v(c) = 0$ for $c \notin \{c_1, c_2\}$)
-under a single structural mode $u(i_0) = \beta > 0$ (and $u(i) = 0$ for $i \neq i_0$), the DarkSnail
-post-readout logit $\ell_{\mathrm{post}}(k) = \ell_{\mathrm{sym}}(k) + \mathrm{triadOperator}\,C\,W\,u\,v\,k$
-satisfies:
-$$\ell_{\mathrm{post}}(c_1) - \ell_{\mathrm{post}}(c_2) = 2 \cdot \beta \cdot \alpha \cdot (W(i_0, c_2, c_1) - W(i_0, c_1, c_2)),$$
-and whenever $W(i_0, c_2, c_1) > W(i_0, c_1, c_2)$, we strictly have
-$$\ell_{\mathrm{post}}(c_1) > \ell_{\mathrm{post}}(c_2).$$ -/
+/-- **Theorem 2.2 (`occlusion_triad_breaks_symmetric_tie`)**:
+Under a symmetric readout tie $\ell_{\mathrm{sym}}(c_1) = \ell_{\mathrm{sym}}(c_2)$, the bilinear
+triad shift produces an exact antisymmetric margin:
+$$\ell_{\mathrm{post}}(c_1) - \ell_{\mathrm{post}}(c_2) = 2 \beta \alpha (W(i_0, c_2, c_1) - W(i_0, c_1, c_2)),$$
+strictly breaking the tie whenever $W(i_0, c_2, c_1) > W(i_0, c_1, c_2)$. -/
 theorem occlusion_triad_breaks_symmetric_tie {C : ℕ}
     (ℓ_sym : Fin C → ℝ) (W : Fin C → Fin C → Fin C → ℝ)
     (u v : Fin C → ℝ) (i₀ c₁ c₂ : Fin C) (α β : ℝ)
-    (hα : 0 < α) (hβ : 0 < β)
-    (h_tie : ℓ_sym c₁ = ℓ_sym c₂)
-    (hu_i0 : u i₀ = β)
-    (hu_other : ∀ i : Fin C, i ≠ i₀ → u i = 0)
-    (hv_c1 : v c₁ = α)
-    (hv_c2 : v c₂ = α)
+    (hα : 0 < α) (hβ : 0 < β) (h_tie : ℓ_sym c₁ = ℓ_sym c₂)
+    (hu_i0 : u i₀ = β) (hu_other : ∀ i : Fin C, i ≠ i₀ → u i = 0)
+    (hv_c1 : v c₁ = α) (hv_c2 : v c₂ = α)
     (hv_other : ∀ c : Fin C, c ≠ c₁ → c ≠ c₂ → v c = 0) :
     (postLogit C ℓ_sym W u v c₁ - postLogit C ℓ_sym W u v c₂ =
       2 * β * α * (W i₀ c₂ c₁ - W i₀ c₁ c₂)) ∧
@@ -185,86 +145,57 @@ theorem occlusion_triad_breaks_symmetric_tie {C : ℕ}
       ring
   exact ⟨h_diff, fun hW => by nlinarith [mul_pos hβ hα]⟩
 
-/-! ### Theorem 3: DarkSnail Readout & Recurrent Triad Energy Conservation -/
+/-! ### Theorem 2.3: Readout Energy Conservation -/
 
-/-- **Theorem 3 (`darksnail_readout_energy_conservation`)**:
-For any structural vector $u$, color state $v$, and triad tensor $W$, the inner product of $v$
-with the DarkSnail triad logit shift vanishes identically:
-$$\sum_{k \in \mathrm{Fin}\,C} v(k) \cdot (\mathrm{triadOperator}\,C\,W\,u\,v\,k) = 0,$$
-and for the Slow-Fast ($z_H \to z_L$) recurrent terminal step
-$\dot{z}_L = \mathrm{triadOperator}\,M\,W_{\mathrm{rec}}\,z_H\,z_L$, the radial energy growth rate
-$\langle z_L, \dot{z}_L \rangle$ vanishes identically. -/
+/-- **Theorem 2.3 (`darksnail_readout_energy_conservation`)**:
+For any mode vectors $u, v$ and coupling tensor $W$, $\langle v, B_W(u, v) \rangle = 0$,
+and the Slow-Fast recurrent pump has zero radial energy growth. -/
 theorem darksnail_readout_energy_conservation {C M : ℕ}
     (W : Fin C → Fin C → Fin C → ℝ) (u v : Fin C → ℝ)
     (W_rec : Fin M → Fin M → Fin M → ℝ) (z_H z_L : Fin M → ℝ) :
-    (∑ k : Fin C, v k * triadOperator C W u v k) = 0 ∧
-    Formalization.Analysis.shellInner z_L (triadOperator M W_rec z_H z_L) = 0 :=
-  ⟨Formalization.Analysis.triad_pointwise_orthogonal W u v,
-   Formalization.Analysis.triad_pointwise_orthogonal W_rec z_H z_L⟩
+    (∑ k : Fin C, v k * triadOperator W u v k) = 0 ∧
+    shellInner z_L (triadOperator W_rec z_H z_L) = 0 :=
+  ⟨triad_pointwise_orthogonal W u v, triad_pointwise_orthogonal W_rec z_H z_L⟩
 
-/-! ### Theorem 4: Step-0 System 1 Homotopy Equivalence -/
+/-! ### Theorem 2.4: Step-0 System 1 Homotopy Equivalence -/
 
-/-- Full DarkSnail readout combining pretrained System 1 logits $\ell_{\mathrm{S1}}$,
-symmetric residual shift $\Delta_{\mathrm{sym}}$, and skew-symmetric triad readout shift. -/
+/-- Full readout combining System 1 baseline, symmetric shift, and skew triad shift. -/
 def darksnailReadout (C : ℕ) (ℓ_S1 Δ_sym : Fin C → ℝ)
     (W : Fin C → Fin C → Fin C → ℝ) (u v : Fin C → ℝ) (k : Fin C) : ℝ :=
-  ℓ_S1 k + Δ_sym k + triadOperator C W u v k
+  ℓ_S1 k + Δ_sym k + triadOperator W u v k
 
-/-- **Theorem 4 (`darksnail_step0_system1_homotopy`)**:
-At the Step-0 initialization $\Delta_{\mathrm{sym}} = 0$ and $W = 0$ (corresponding to $\delta z = 0$),
-the DarkSnail readout equals the pretrained System 1 logit identically for all colors $k$:
-$$\ell_{\mathrm{DS}}(\ell_{\mathrm{S1}}, 0, 0, u, v, k) = \ell_{\mathrm{S1}}(k).$$ -/
+/-- **Theorem 2.4 (`darksnail_step0_system1_homotopy`)**:
+At Step-0 ($\Delta_{\mathrm{sym}} = 0, W = 0$), the full readout reduces identically to System 1. -/
 theorem darksnail_step0_system1_homotopy {C : ℕ}
     (ℓ_S1 u v : Fin C → ℝ) (k : Fin C) :
     darksnailReadout C ℓ_S1 0 0 u v k = ℓ_S1 k := by
-  simp [darksnailReadout, triadOperator, Formalization.Analysis.triadOperator]
+  simp [darksnailReadout, triadOperator]
 
-/-! ### Theorem 5: 2D Axial RoPE Medoid Invariance & Patch-Averaging Attenuation -/
+/-! ### Theorem 2.5: 2D Axial RoPE Medoid Invariance & Patch-Averaging Attenuation -/
 
-/-- 2D rotation on $\mathbb{R} \times \mathbb{R}$ by angle $\theta$. -/
 noncomputable def rot2 (θ : ℝ) (v : ℝ × ℝ) : ℝ × ℝ :=
   (Real.cos θ * v.1 - Real.sin θ * v.2, Real.sin θ * v.1 + Real.cos θ * v.2)
 
-/-- Standard inner product on $\mathbb{R} \times \mathbb{R}$. -/
-def inner2 (u v : ℝ × ℝ) : ℝ :=
-  u.1 * v.1 + u.2 * v.2
+def inner2 (u v : ℝ × ℝ) : ℝ := u.1 * v.1 + u.2 * v.2
+def normSq2 (v : ℝ × ℝ) : ℝ := inner2 v v
 
-/-- Squared Euclidean norm on $\mathbb{R} \times \mathbb{R}$. -/
-def normSq2 (v : ℝ × ℝ) : ℝ :=
-  inner2 v v
-
-/-- 2D axial RoPE embedding on $(\mathbb{R} \times \mathbb{R}) \times (\mathbb{R} \times \mathbb{R})$
-applying vertical rotation $\theta_y$ to the $y$-slice and horizontal rotation $\theta_x$ to the $x$-slice. -/
 noncomputable def rope2d (θ_y θ_x : ℝ) (q_y q_x : ℝ × ℝ) : (ℝ × ℝ) × (ℝ × ℝ) :=
   (rot2 θ_y q_y, rot2 θ_x q_x)
 
-/-- 2D axial inner product summing the vertical and horizontal slice inner products. -/
-def inner2d (u v : (ℝ × ℝ) × (ℝ × ℝ)) : ℝ :=
-  inner2 u.1 v.1 + inner2 u.2 v.2
+def inner2d (u v : (ℝ × ℝ) × (ℝ × ℝ)) : ℝ := inner2 u.1 v.1 + inner2 u.2 v.2
+def normSq2d (v : (ℝ × ℝ) × (ℝ × ℝ)) : ℝ := normSq2 v.1 + normSq2 v.2
+noncomputable def avg2 (u v : ℝ × ℝ) : ℝ × ℝ := ((u.1 + v.1) / 2, (u.2 + v.2) / 2)
 
-/-- Squared Euclidean norm on the 2D axial space $(\mathbb{R} \times \mathbb{R}) \times (\mathbb{R} \times \mathbb{R})$. -/
-def normSq2d (v : (ℝ × ℝ) × (ℝ × ℝ)) : ℝ :=
-  normSq2 v.1 + normSq2 v.2
-
-/-- Arithmetic midpoint of two 2D vectors. -/
-noncomputable def avg2 (u v : ℝ × ℝ) : ℝ × ℝ :=
-  ((u.1 + v.1) / 2, (u.2 + v.2) / 2)
-
-/-- 2D arithmetic patch average of a key $(k_y, k_x)$ across two 2D grid phases $(\theta_{y,1}, \theta_{x,1})$
-and $(\theta_{y,2}, \theta_{x,2})$. -/
 noncomputable def rope2dPatchAvg (θ_y1 θ_x1 θ_y2 θ_x2 : ℝ) (k_y k_x : ℝ × ℝ) : (ℝ × ℝ) × (ℝ × ℝ) :=
   (avg2 (rot2 θ_y1 k_y) (rot2 θ_y2 k_y), avg2 (rot2 θ_x1 k_x) (rot2 θ_x2 k_x))
 
-/-- Single-axis rotational shift invariance for `rot2` and `inner2`. -/
 lemma inner2_rot2_shift (α β : ℝ) (u v : ℝ × ℝ) :
     inner2 (rot2 α u) (rot2 β v) = inner2 u (rot2 (β - α) v) := by
   unfold inner2 rot2; rw [Real.cos_sub, Real.sin_sub]; ring
 
-/-- **Theorem 5a (`rope2d_medoid_relative_invariance`)**:
-For any query at 2D angular coordinate $(y_q, x_q)$ and 2D medoid key at coordinate $(y^*, x^*)$,
-the 2D axial rotary inner product is invariant under global grid translation and depends purely on
-the relative 2D displacement $(y^* - y_q, x^* - x_q)$:
-$$\langle \mathrm{rope2d}(y_q, x_q, q_y, q_x), \mathrm{rope2d}(y^*, x^*, k_y, k_x) \rangle
+/-- **Theorem 2.5a (`rope2d_medoid_relative_invariance`)**:
+The 2D axial rotary inner product depends purely on the relative 2D displacement:
+$$\langle \mathrm{rope2d}(y_q, x_q, q), \mathrm{rope2d}(y^*, x^*, k) \rangle
   = \langle q_y, \mathcal{R}_{y^* - y_q} k_y \rangle + \langle q_x, \mathcal{R}_{x^* - x_q} k_x \rangle.$$ -/
 theorem rope2d_medoid_relative_invariance
     (y_q x_q y_star x_star : ℝ) (q_y q_x k_y k_x : ℝ × ℝ) :
@@ -272,188 +203,134 @@ theorem rope2d_medoid_relative_invariance
       inner2 q_y (rot2 (y_star - y_q) k_y) + inner2 q_x (rot2 (x_star - x_q) k_x) := by
   unfold inner2d rope2d; rw [inner2_rot2_shift, inner2_rot2_shift]
 
-/-- Exact squared norm identity for the 2-point arithmetic average of rotated 2D vectors:
-$$\left\|\frac{\mathcal{R}_{\theta_1} k + \mathcal{R}_{\theta_2} k}{2}\right\|^2
-  = \|k\|^2 \cdot \frac{1 + \cos(\theta_1 - \theta_2)}{2}.$$ -/
 lemma normSq2_avg2_rot2 (θ₁ θ₂ : ℝ) (k : ℝ × ℝ) :
     normSq2 (avg2 (rot2 θ₁ k) (rot2 θ₂ k)) =
       normSq2 k * (1 + Real.cos (θ₁ - θ₂)) / 2 := by
-  unfold normSq2 inner2 avg2 rot2
-  rw [Real.cos_sub]
+  unfold normSq2 inner2 avg2 rot2; rw [Real.cos_sub]
   linear_combination
     ((k.1 ^ 2 + k.2 ^ 2) / 4) * Real.cos_sq_add_sin_sq θ₁ +
     ((k.1 ^ 2 + k.2 ^ 2) / 4) * Real.cos_sq_add_sin_sq θ₂
 
-/-- Non-negativity of `normSq2`. -/
 lemma normSq2_nonneg (k : ℝ × ℝ) : 0 ≤ normSq2 k :=
   add_nonneg (mul_self_nonneg k.1) (mul_self_nonneg k.2)
 
-/-- Non-expansion of single-axis arithmetic average squared norm. -/
-lemma normSq2_avg2_rot2_le (θ₁ θ₂ : ℝ) (k : ℝ × ℝ) :
-    normSq2 (avg2 (rot2 θ₁ k) (rot2 θ₂ k)) ≤ normSq2 k := by
-  rw [normSq2_avg2_rot2]
-  nlinarith [Real.cos_le_one (θ₁ - θ₂), normSq2_nonneg k]
-
-/-- Strict attenuation of single-axis arithmetic average squared norm when $\cos(\theta_1 - \theta_2) < 1$
-and $\|k\|^2 > 0$. -/
-lemma normSq2_avg2_rot2_lt (θ₁ θ₂ : ℝ) (k : ℝ × ℝ)
-    (hcos : Real.cos (θ₁ - θ₂) < 1) (hk : 0 < normSq2 k) :
-    normSq2 (avg2 (rot2 θ₁ k) (rot2 θ₂ k)) < normSq2 k := by
-  rw [normSq2_avg2_rot2]; nlinarith
-
-/-- **Theorem 5b (`rope2d_arithmetic_norm_lt`)**:
-Whenever either the vertical phase difference satisfies $\cos(\theta_{y,1} - \theta_{y,2}) < 1$ with
-$\|k_y\|^2 > 0$, or the horizontal phase difference satisfies $\cos(\theta_{x,1} - \theta_{x,2}) < 1$
-with $\|k_x\|^2 > 0$, 2D arithmetic patch averaging strictly attenuates the squared 2D key norm:
-$$\|\mathrm{rope2dPatchAvg}(\theta_{y,1}, \theta_{x,1}, \theta_{y,2}, \theta_{x,2}, k_y, k_x)\|^2
-  < \|(k_y, k_x)\|^2.$$ -/
+/-- **Theorem 2.5b (`rope2d_arithmetic_norm_lt`)**:
+Arithmetic patch averaging across distinct grid phases strictly attenuates 2D key norm:
+$$\|\mathrm{rope2dPatchAvg}(\theta, k)\|^2 < \|k\|^2.$$ -/
 theorem rope2d_arithmetic_norm_lt
     (θ_y1 θ_x1 θ_y2 θ_x2 : ℝ) (k_y k_x : ℝ × ℝ)
     (h_att : (Real.cos (θ_y1 - θ_y2) < 1 ∧ 0 < normSq2 k_y) ∨
              (Real.cos (θ_x1 - θ_x2) < 1 ∧ 0 < normSq2 k_x)) :
     normSq2d (rope2dPatchAvg θ_y1 θ_x1 θ_y2 θ_x2 k_y k_x) < normSq2d (k_y, k_x) := by
-  unfold normSq2d rope2dPatchAvg
-  rcases h_att with ⟨hcy, hky⟩ | ⟨hcx, hkx⟩
-  · linarith [normSq2_avg2_rot2_lt θ_y1 θ_y2 k_y hcy hky, normSq2_avg2_rot2_le θ_x1 θ_x2 k_x]
-  · linarith [normSq2_avg2_rot2_le θ_y1 θ_y2 k_y, normSq2_avg2_rot2_lt θ_x1 θ_x2 k_x hcx hkx]
+  unfold normSq2d rope2dPatchAvg; dsimp only
+  rw [normSq2_avg2_rot2, normSq2_avg2_rot2]
+  have hy := normSq2_nonneg k_y
+  have hx := normSq2_nonneg k_x
+  have hcy := Real.cos_le_one (θ_y1 - θ_y2)
+  have hcx := Real.cos_le_one (θ_x1 - θ_x2)
+  rcases h_att with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> nlinarith
 
-/-! ### Theorem 6: Multi-Step Unrolled Slow-Fast Spherical Invariance & Step-0 Homotopy -/
+/-! ### Theorem 2.6: Multi-Step Unrolled Slow-Fast Spherical Invariance -/
 
-/-- Scaled tangent triad step $\delta v_k = \gamma \cdot B_{W_{\mathrm{rec}}}(u, v)_k$. -/
 def tangentTriadStep (M : ℕ) (γ : ℝ) (W_rec : Fin M → Fin M → Fin M → ℝ)
     (u v : Fin M → ℝ) (k : Fin M) : ℝ :=
-  γ * triadOperator M W_rec u v k
+  γ * triadOperator W_rec u v k
 
-/-- Spherical norm retraction $\tilde{v}_k = \frac{\|v\|_2}{\|v_{\mathrm{upd}}\|_2} v_{\mathrm{upd}, k}$. -/
 noncomputable def sphericalRetract {M : ℕ} (v v_upd : Fin M → ℝ) (k : Fin M) : ℝ :=
-  (Real.sqrt (Formalization.Analysis.shellEnergy v) /
-   Real.sqrt (Formalization.Analysis.shellEnergy v_upd)) * v_upd k
+  (Real.sqrt (shellEnergy v) / Real.sqrt (shellEnergy v_upd)) * v_upd k
 
-/-- Single-step tangent triad update followed by spherical norm retraction:
-$$\tilde{v}_L = \frac{\|v_L\|_2}{\|v_L + \delta v_L\|_2} (v_L + \delta v_L), \qquad
-  \delta v_L = \gamma B_{W_{\mathrm{rec}}}(u, v_L).$$ -/
 noncomputable def sphericalTriadStep (M : ℕ) (γ : ℝ) (W_rec : Fin M → Fin M → Fin M → ℝ)
     (u v : Fin M → ℝ) : Fin M → ℝ :=
-  let δv := tangentTriadStep M γ W_rec u v
-  sphericalRetract v (fun k => v k + δv k)
+  sphericalRetract v (fun k => v k + tangentTriadStep M γ W_rec u v k)
 
-/-- $T$-step unrolled Slow-Fast spherical triad trajectory $\tilde{v}_L^{(t)}$. -/
 noncomputable def multistepSphericalTriad (M : ℕ) (γ : ℕ → ℝ)
     (W_rec : ℕ → Fin M → Fin M → Fin M → ℝ)
     (u : ℕ → Fin M → ℝ) (v₀ : Fin M → ℝ) : ℕ → (Fin M → ℝ)
   | 0 => v₀
-  | t + 1 =>
-      let v_t := multistepSphericalTriad M γ W_rec u v₀ t
-      sphericalTriadStep M (γ t) (W_rec t) (u t) v_t
+  | t + 1 => sphericalTriadStep M (γ t) (W_rec t) (u t) (multistepSphericalTriad M γ W_rec u v₀ t)
 
-/-- Non-negativity of `shellEnergy`. -/
-lemma shellEnergy_nonneg {M : ℕ} (x : Fin M → ℝ) :
-    0 ≤ Formalization.Analysis.shellEnergy x := by
-  unfold Formalization.Analysis.shellEnergy Formalization.Analysis.shellInner
-  exact Finset.sum_nonneg fun k _ => mul_self_nonneg (x k)
+lemma shellEnergy_nonneg {M : ℕ} (x : Fin M → ℝ) : 0 ≤ shellEnergy x :=
+  Finset.sum_nonneg (s := Finset.univ) fun k _ => mul_self_nonneg (x k)
 
-/-- `shellEnergy x = 0` if and only if $x$ vanishes pointwise. -/
 lemma shellEnergy_eq_zero_iff {M : ℕ} (x : Fin M → ℝ) :
-    Formalization.Analysis.shellEnergy x = 0 ↔ ∀ k : Fin M, x k = 0 := by
-  unfold Formalization.Analysis.shellEnergy Formalization.Analysis.shellInner
+    shellEnergy x = 0 ↔ ∀ k : Fin M, x k = 0 := by
+  unfold shellEnergy shellInner
   simp [Finset.sum_eq_zero_iff_of_nonneg (fun k _ => mul_self_nonneg (x k))]
 
-/-- Pointwise orthogonality $\langle v, \delta v \rangle = 0$ for the scaled tangent triad step. -/
 lemma tangentTriadStep_orthogonal {M : ℕ} (γ : ℝ) (W_rec : Fin M → Fin M → Fin M → ℝ)
     (u v : Fin M → ℝ) :
-    Formalization.Analysis.shellInner v (tangentTriadStep M γ W_rec u v) = 0 := by
-  calc Formalization.Analysis.shellInner v (tangentTriadStep M γ W_rec u v)
-    _ = γ * Formalization.Analysis.shellInner v (Formalization.Analysis.triadOperator W_rec u v) := by
-        unfold Formalization.Analysis.shellInner tangentTriadStep triadOperator
-        rw [Finset.mul_sum]
-        exact Finset.sum_congr rfl fun k _ => by ring
-    _ = 0 := by rw [Formalization.Analysis.triad_pointwise_orthogonal, mul_zero]
+    shellInner v (tangentTriadStep M γ W_rec u v) = 0 := by
+  have h : shellInner v (tangentTriadStep M γ W_rec u v) =
+      γ * shellInner v (triadOperator W_rec u v) := by
+    unfold shellInner tangentTriadStep; rw [Finset.mul_sum]
+    exact Finset.sum_congr rfl fun k _ => by ring
+  rw [h, triad_pointwise_orthogonal, mul_zero]
 
-/-- Discrete-time Pythagorean identity under orthogonal tangent updates $\langle v, \delta v \rangle = 0$. -/
 lemma shellEnergy_add_of_orthogonal {M : ℕ} (v δv : Fin M → ℝ)
-    (h_orth : Formalization.Analysis.shellInner v δv = 0) :
-    Formalization.Analysis.shellEnergy (fun k => v k + δv k) =
-      Formalization.Analysis.shellEnergy v + Formalization.Analysis.shellEnergy δv := by
+    (h_orth : shellInner v δv = 0) :
+    shellEnergy (fun k => v k + δv k) = shellEnergy v + shellEnergy δv := by
   have h_expand :
-      Formalization.Analysis.shellEnergy (fun k => v k + δv k) =
-        Formalization.Analysis.shellEnergy v +
-        2 * Formalization.Analysis.shellInner v δv +
-        Formalization.Analysis.shellEnergy δv := by
-    unfold Formalization.Analysis.shellEnergy Formalization.Analysis.shellInner
+      shellEnergy (fun k => v k + δv k) =
+        shellEnergy v + 2 * shellInner v δv + shellEnergy δv := by
+    unfold shellEnergy shellInner
     simp only [← Finset.sum_add_distrib, Finset.mul_sum]
     exact Finset.sum_congr rfl fun k _ => by ring
   linarith
 
-/-- Quadratic homogeneity of `shellEnergy` under scalar multiplication. -/
 lemma shellEnergy_scale {M : ℕ} (c : ℝ) (x : Fin M → ℝ) :
-    Formalization.Analysis.shellEnergy (fun k => c * x k) =
-      c ^ 2 * Formalization.Analysis.shellEnergy x := by
-  unfold Formalization.Analysis.shellEnergy Formalization.Analysis.shellInner
-  rw [Finset.mul_sum]
+    shellEnergy (fun k => c * x k) = c ^ 2 * shellEnergy x := by
+  unfold shellEnergy shellInner; rw [Finset.mul_sum]
   exact Finset.sum_congr rfl fun k _ => by ring
 
-/-- Single-step spherical triad update preserves exact shell energy $\|\tilde{v}\|_2^2 = \|v\|_2^2$. -/
 lemma sphericalTriadStep_preserves_energy {M : ℕ} (γ : ℝ)
     (W_rec : Fin M → Fin M → Fin M → ℝ) (u v : Fin M → ℝ) :
-    Formalization.Analysis.shellEnergy (sphericalTriadStep M γ W_rec u v) =
-      Formalization.Analysis.shellEnergy v := by
+    shellEnergy (sphericalTriadStep M γ W_rec u v) = shellEnergy v := by
   unfold sphericalTriadStep sphericalRetract
-  dsimp only
   rw [shellEnergy_scale]
-  by_cases hv0 : Formalization.Analysis.shellEnergy v = 0
+  by_cases hv0 : shellEnergy v = 0
   · simp [hv0]
   · have hv_nonneg := shellEnergy_nonneg v
     have h_pyth := shellEnergy_add_of_orthogonal v _ (tangentTriadStep_orthogonal γ W_rec u v)
-    have h_upd_pos :
-        0 < Formalization.Analysis.shellEnergy (fun k => v k + tangentTriadStep M γ W_rec u v k) := by
+    have h_upd_pos : 0 < shellEnergy (fun k => v k + tangentTriadStep M γ W_rec u v k) := by
       linarith [lt_of_le_of_ne hv_nonneg (Ne.symm hv0),
                 shellEnergy_nonneg (tangentTriadStep M γ W_rec u v)]
     rw [div_pow, Real.sq_sqrt hv_nonneg, Real.sq_sqrt (le_of_lt h_upd_pos),
         div_mul_cancel₀ _ (ne_of_gt h_upd_pos)]
 
-/-- **Theorem 6a (`darksnail_multistep_spherical_invariance`)**:
-Across any $T$-step unrolled Slow-Fast spherical triad cascade $(v_L^{(t)})_{t=0}^T$,
-the terminal retracted state preserves the exact initial squared Euclidean norm
-$\|\tilde{v}_L^{(T)}\|_2^2 = \|v_L^{(0)}\|_2^2$, and at every intermediate step $t$,
-the tangent triad perturbation $\delta v_L^{(t)}$ is strictly orthogonal to $v_L^{(t)}$:
-$\langle v_L^{(t)}, \delta v_L^{(t)} \rangle = 0$. -/
+/-- **Theorem 2.6a (`darksnail_multistep_spherical_invariance`)**:
+Across any $T$-step unrolled cascade, the terminal retracted state preserves exact initial norm:
+$$\|\tilde{v}_L^{(T)}\|_2^2 = \|v_L^{(0)}\|_2^2.$$ -/
 theorem darksnail_multistep_spherical_invariance {M : ℕ}
     (γ : ℕ → ℝ) (W_rec : ℕ → Fin M → Fin M → Fin M → ℝ)
     (u : ℕ → Fin M → ℝ) (v₀ : Fin M → ℝ) (T : ℕ) :
-    Formalization.Analysis.shellEnergy (multistepSphericalTriad M γ W_rec u v₀ T) =
-      Formalization.Analysis.shellEnergy v₀ ∧
+    shellEnergy (multistepSphericalTriad M γ W_rec u v₀ T) = shellEnergy v₀ ∧
     (∀ t : ℕ,
       let v_t := multistepSphericalTriad M γ W_rec u v₀ t
       let δv_t := tangentTriadStep M (γ t) (W_rec t) (u t) v_t
-      Formalization.Analysis.shellInner v_t δv_t = 0) := by
+      shellInner v_t δv_t = 0) := by
   refine ⟨?_, fun t => tangentTriadStep_orthogonal (γ t) (W_rec t) (u t) _⟩
   induction T with
   | zero => rfl
   | succ t ih => simp [multistepSphericalTriad, sphericalTriadStep_preserves_energy, ih]
 
-/-- At $W_{\mathrm{rec}} = 0$, the single-step spherical triad update reduces to the identity. -/
 lemma sphericalTriadStep_zero {M : ℕ} (γ : ℝ) (u v : Fin M → ℝ) :
     sphericalTriadStep M γ 0 u v = v := by
   funext k
   have h_tan : (fun i => v i + tangentTriadStep M γ 0 u v i) = v := by
-    funext i; simp [tangentTriadStep, triadOperator, Formalization.Analysis.triadOperator]
+    funext i; simp [tangentTriadStep, triadOperator]
   unfold sphericalTriadStep sphericalRetract
-  dsimp only
-  rw [h_tan, congr_fun h_tan k]
-  by_cases hv0 : Formalization.Analysis.shellEnergy v = 0
+  rw [h_tan]
+  by_cases hv0 : shellEnergy v = 0
   · simp [hv0, (shellEnergy_eq_zero_iff v).mp hv0 k]
   · have hv_pos := lt_of_le_of_ne (shellEnergy_nonneg v) (Ne.symm hv0)
     rw [div_self (ne_of_gt (Real.sqrt_pos.mpr hv_pos)), one_mul]
 
-/-- Unmodified System 1 recurrent carry trajectory $(z_H^{(t)}, z_L^{(t)})_{t=0}^T$. -/
 def system1CarryTrajectory {M : ℕ}
     (step_S1 : ℕ → (Fin M → ℝ) × (Fin M → ℝ) → (Fin M → ℝ) × (Fin M → ℝ))
     (z₀ : (Fin M → ℝ) × (Fin M → ℝ)) : ℕ → (Fin M → ℝ) × (Fin M → ℝ)
   | 0 => z₀
   | t + 1 => step_S1 t (system1CarryTrajectory step_S1 z₀ t)
 
-/-- DarkSnail $T$-step unrolled Slow-Fast recurrent carry trajectory coupling
-$z_H^{(t)} \to z_L^{(t)}$ via `sphericalTriadStep` and latent perturbation $(\delta z_H^{(t)}, \delta z_L^{(t)})$. -/
 noncomputable def darksnailCarryTrajectory {M : ℕ}
     (step_S1 : ℕ → (Fin M → ℝ) × (Fin M → ℝ) → (Fin M → ℝ) × (Fin M → ℝ))
     (γ : ℕ → ℝ) (W_rec : ℕ → Fin M → Fin M → Fin M → ℝ)
@@ -465,11 +342,8 @@ noncomputable def darksnailCarryTrajectory {M : ℕ}
       let v_tilde := sphericalTriadStep M (γ t) (W_rec t) z_t.1 z_t.2
       step_S1 t (fun k => z_t.1 k + δz_H t k, fun k => v_tilde k + δz_L t k)
 
-/-- **Theorem 6b (`darksnail_multistep_step0_homotopy`)**:
-At the Step-0 initialization $W_{\mathrm{rec}} = 0$ and $\delta z = (0, 0)$, the $T$-step unrolled
-spherical shell trajectory remains stationary at $v_0$, and the full $T$-step unrolled DarkSnail
-recurrent carry trajectory reduces identically to the unmodified System 1 recurrent carry
-trajectory $(z_H^{(t)}, z_L^{(t)})_{t=0}^T$ for all $T \in \mathbb{N}$. -/
+/-- **Theorem 2.6b (`darksnail_multistep_step0_homotopy`)**:
+At $W_{\mathrm{rec}} = 0$ and $\delta z = 0$, the $T$-step unrolled cascade reduces identically to System 1. -/
 theorem darksnail_multistep_step0_homotopy {M : ℕ}
     (step_S1 : ℕ → (Fin M → ℝ) × (Fin M → ℝ) → (Fin M → ℝ) × (Fin M → ℝ))
     (γ : ℕ → ℝ) (u : ℕ → Fin M → ℝ) (v₀ : Fin M → ℝ)
@@ -483,62 +357,38 @@ theorem darksnail_multistep_step0_homotopy {M : ℕ}
     simp [multistepSphericalTriad, darksnailCarryTrajectory, system1CarryTrajectory,
           ih, sphericalTriadStep_zero]
 
-/-! ### Theorem 7 (Family 2.7): SO(6) Kelvin-Mandel Stiffness Rotor Conservation & Caliper Morse Shielding -/
+/-! ### Theorem 2.7: SO(6) Kelvin-Mandel Stiffness Rotor & Discrete Morse Shielding -/
 
-/-- 6D Kelvin-Mandel quadratic elastic strain energy form
-$$E_C(\varepsilon) = \varepsilon^\top C \varepsilon = \sum_{i, j \in \mathrm{Fin}\,6} \varepsilon_i C_{i,j} \varepsilon_j$$
-(`g3vm/anisotropy.py`). -/
 def elasticEnergy6 (C : Fin 6 → Fin 6 → ℝ) (ε : Fin 6 → ℝ) : ℝ :=
   ∑ i : Fin 6, ∑ j : Fin 6, ε i * C i j * ε j
 
-/-- $6 \times 6$ matrix-vector product $(M x)_i = \sum_{j \in \mathrm{Fin}\,6} M_{i,j} x_j$. -/
 def matVec6 (M : Fin 6 → Fin 6 → ℝ) (x : Fin 6 → ℝ) (i : Fin 6) : ℝ :=
   ∑ j : Fin 6, M i j * x j
 
-/-- $6 \times 6$ matrix transpose $(M^\top)_{i,j} = M_{j,i}$. -/
-def matTranspose6 (M : Fin 6 → Fin 6 → ℝ) (i j : Fin 6) : ℝ :=
-  M j i
+def matTranspose6 (M : Fin 6 → Fin 6 → ℝ) (i j : Fin 6) : ℝ := M j i
 
-/-- Rotated $6 \times 6$ Kelvin-Mandel stiffness tensor under a 6D rotor $M$:
-$$(M C M^\top)_{i,j} = \sum_{k, l \in \mathrm{Fin}\,6} M_{i,k} C_{k,l} M_{j,l}.$$ -/
 def rotateStiffness6 (M C : Fin 6 → Fin 6 → ℝ) (i j : Fin 6) : ℝ :=
   ∑ k : Fin 6, ∑ l : Fin 6, M i k * C k l * M j l
 
-/-- Trace of a $6 \times 6$ Kelvin-Mandel stiffness tensor $\mathrm{Tr}(C) = \sum_{i \in \mathrm{Fin}\,6} C_{i,i}$. -/
-def trace6 (C : Fin 6 → Fin 6 → ℝ) : ℝ :=
-  ∑ i : Fin 6, C i i
+def trace6 (C : Fin 6 → Fin 6 → ℝ) : ℝ := ∑ i : Fin 6, C i i
 
-/-- 6D norm-preserving orthogonality predicate on Kelvin-Mandel strain space:
-$$\|M^\top x\|_2^2 = \|x\|_2^2 \quad \forall x \in \mathbb{R}^6.$$ -/
 def IsOrthogonal6 (M : Fin 6 → Fin 6 → ℝ) : Prop :=
-  ∀ x : Fin 6 → ℝ,
-    Formalization.Analysis.shellEnergy (matVec6 (matTranspose6 M) x) =
-      Formalization.Analysis.shellEnergy x
+  ∀ x : Fin 6 → ℝ, shellEnergy (matVec6 (matTranspose6 M) x) = shellEnergy x
 
-/-- Column-orthonormality predicate $M^\top M = I_6$ ($\sum_{i \in \mathrm{Fin}\,6} M_{i,k} M_{i,l} = \delta_{k,l}$)
-for $6 \times 6$ Kelvin-Mandel stiffness rotors. -/
 def IsColOrthonormal6 (M : Fin 6 → Fin 6 → ℝ) : Prop :=
   ∀ k l : Fin 6, (∑ i : Fin 6, M i k * M i l) = if k = l then 1 else 0
 
-/-- Row-orthonormality predicate $M M^\top = I_6$ ($\sum_{k \in \mathrm{Fin}\,6} M_{i,k} M_{j,k} = \delta_{i,j}$)
-for $6 \times 6$ Kelvin-Mandel stiffness rotors. -/
 def IsRowOrthonormal6 (M : Fin 6 → Fin 6 → ℝ) : Prop :=
   ∀ i j : Fin 6, (∑ k : Fin 6, M i k * M j k) = if i = j then 1 else 0
 
-/-- Any row-orthonormal $6 \times 6$ matrix $M$ ($M M^\top = I_6$) preserves the 6D Euclidean
-strain norm (`IsOrthogonal6 M`). -/
 lemma isOrthogonal6_of_rowOrthonormal6 (M : Fin 6 → Fin 6 → ℝ)
-    (hM : IsRowOrthonormal6 M) :
-    IsOrthogonal6 M := by
-  intro x
-  unfold Formalization.Analysis.shellEnergy Formalization.Analysis.shellInner matVec6 matTranspose6
+    (hM : IsRowOrthonormal6 M) : IsOrthogonal6 M := fun x => by
+  unfold shellEnergy shellInner matVec6 matTranspose6
   calc (∑ k : Fin 6, (∑ i : Fin 6, M i k * x i) * (∑ j : Fin 6, M j k * x j))
     _ = ∑ i : Fin 6, ∑ j : Fin 6, x i * x j * (∑ k : Fin 6, M i k * M j k) := by
         simp only [Fin.sum_univ_six]; ring
     _ = ∑ k : Fin 6, x k * x k := by simp [hM _ _]
 
-/-- Explicit planar bedding-dip Kelvin-Mandel stiffness rotor $M(R_y(\theta)) : \mathrm{Fin}\,6 \to \mathrm{Fin}\,6 \to \mathbb{R}$
-for a dip tilt by angle $\theta$ in the $(x_1, x_3)$ plane (`build_kelvin_mandel_so6_rotor` in `g3vm/anisotropy.py`). -/
 noncomputable def kelvinMandelDipRotor (θ : ℝ) (i j : Fin 6) : ℝ :=
   let c := Real.cos θ
   let s := Real.sin θ
@@ -560,14 +410,6 @@ noncomputable def kelvinMandelDipRotor (θ : ℝ) (i j : Fin 6) : ℝ :=
   | 5, 5 => c
   | _, _ => 0
 
-/-- At zero bedding dip ($\theta = 0$), the planar Kelvin-Mandel dip rotor reduces to the $6 \times 6$ identity matrix. -/
-lemma kelvinMandelDipRotor_zero (i j : Fin 6) :
-    kelvinMandelDipRotor 0 i j = if i = j then 1 else 0 := by
-  fin_cases i <;> fin_cases j <;> simp [kelvinMandelDipRotor]
-
-/-- For every bedding dip angle $\theta \in \mathbb{R}$, the planar Kelvin-Mandel dip rotor
-`kelvinMandelDipRotor θ` is row-orthonormal ($M M^\top = I_6$), column-orthonormal
-($M^\top M = I_6$), and orthogonal (`IsOrthogonal6`). -/
 lemma kelvinMandelDipRotor_orthonormal (θ : ℝ) :
     IsRowOrthonormal6 (kelvinMandelDipRotor θ) ∧
     IsColOrthonormal6 (kelvinMandelDipRotor θ) ∧
@@ -590,44 +432,28 @@ lemma kelvinMandelDipRotor_orthonormal (θ : ℝ) :
   exact ⟨h_row θ, fun k l => by simpa only [h_tr] using h_row (-θ) k l,
     isOrthogonal6_of_rowOrthonormal6 _ (h_row θ)⟩
 
-/-- **Theorem 7a (`elasticEnergy6_rotateStiffness6`)**:
-For any $6 \times 6$ matrices $M, C$ and strain vector $\varepsilon : \mathrm{Fin}\,6 \to \mathbb{R}$,
-the elastic strain energy of the rotated stiffness tensor `rotateStiffness6 M C` equals the elastic
-strain energy of $C$ evaluated at the counter-rotated strain `matVec6 (matTranspose6 M) ε`:
+/-- **Theorem 2.7a (`elasticEnergy6_rotateStiffness6`)**:
 $$\varepsilon^\top (M C M^\top) \varepsilon = (M^\top \varepsilon)^\top C (M^\top \varepsilon).$$ -/
 theorem elasticEnergy6_rotateStiffness6 (M C : Fin 6 → Fin 6 → ℝ) (ε : Fin 6 → ℝ) :
     elasticEnergy6 (rotateStiffness6 M C) ε =
       elasticEnergy6 C (matVec6 (matTranspose6 M) ε) := by
   simp only [elasticEnergy6, rotateStiffness6, matVec6, matTranspose6, Fin.sum_univ_six]; ring
 
-/-- **Theorem 7b (`so6_stiffness_preserves_pos_def`)**:
-If $M$ satisfies `IsOrthogonal6 M` and $C$ is coercive (strictly positive-definite) with modulus
-$\mu_{\min} > 0$, then the rotated TTI stiffness tensor `rotateStiffness6 M C` preserves the
-exact coercivity lower bound:
-$$\forall \varepsilon \in \mathbb{R}^6, \quad \mu_{\min} \|\varepsilon\|_2^2 \le \varepsilon^\top (M C M^\top) \varepsilon,$$
-and for any non-zero strain ($\exists i, \varepsilon_i \neq 0$), we strictly have
-$$0 < \varepsilon^\top (M C M^\top) \varepsilon.$$ -/
+/-- **Theorem 2.7b (`so6_stiffness_preserves_pos_def`)**:
+Orthogonal Kelvin-Mandel rotation preserves coercivity lower bounds and strict positive-definiteness. -/
 theorem so6_stiffness_preserves_pos_def (M C : Fin 6 → Fin 6 → ℝ) (μ_min : ℝ)
-    (hM : IsOrthogonal6 M)
-    (hμ : 0 < μ_min)
-    (h_coercive : ∀ ξ : Fin 6 → ℝ,
-      μ_min * Formalization.Analysis.shellEnergy ξ ≤ elasticEnergy6 C ξ) :
-    (∀ ε : Fin 6 → ℝ,
-      μ_min * Formalization.Analysis.shellEnergy ε ≤
-        elasticEnergy6 (rotateStiffness6 M C) ε) ∧
+    (hM : IsOrthogonal6 M) (hμ : 0 < μ_min)
+    (h_coercive : ∀ ξ : Fin 6 → ℝ, μ_min * shellEnergy ξ ≤ elasticEnergy6 C ξ) :
+    (∀ ε : Fin 6 → ℝ, μ_min * shellEnergy ε ≤ elasticEnergy6 (rotateStiffness6 M C) ε) ∧
     (∀ ε : Fin 6 → ℝ, (∃ i : Fin 6, ε i ≠ 0) →
       0 < elasticEnergy6 (rotateStiffness6 M C) ε) := by
   have h_bound : ∀ ε : Fin 6 → ℝ,
-      μ_min * Formalization.Analysis.shellEnergy ε ≤
-        elasticEnergy6 (rotateStiffness6 M C) ε := fun ε => by
-    rw [elasticEnergy6_rotateStiffness6, ← hM ε]
-    exact h_coercive _
+      μ_min * shellEnergy ε ≤ elasticEnergy6 (rotateStiffness6 M C) ε := fun ε => by
+    rw [elasticEnergy6_rotateStiffness6, ← hM ε]; exact h_coercive _
   refine ⟨h_bound, fun ε ⟨i, hi⟩ => lt_of_lt_of_le (mul_pos hμ ?_) (h_bound ε)⟩
   exact lt_of_le_of_ne (shellEnergy_nonneg ε) fun h => hi ((shellEnergy_eq_zero_iff ε).mp h.symm i)
 
-/-- **Theorem 7c (`so6_stiffness_trace_conservation`)**:
-For any column-orthonormal $6 \times 6$ Kelvin-Mandel rotor $M$ ($\sum_i M_{i,k} M_{i,l} = \delta_{k,l}$)
-and stiffness tensor $C$, rotating $C$ into tilted strata preserves its exact trace:
+/-- **Theorem 2.7c (`so6_stiffness_trace_conservation`)**:
 $$\mathrm{Tr}(M C M^\top) = \mathrm{Tr}(C).$$ -/
 theorem so6_stiffness_trace_conservation (M C : Fin 6 → Fin 6 → ℝ)
     (hM : IsColOrthonormal6 M) :
@@ -638,47 +464,22 @@ theorem so6_stiffness_trace_conservation (M C : Fin 6 → Fin 6 → ℝ)
         simp only [Fin.sum_univ_six]; ring
     _ = ∑ i : Fin 6, C i i := by simp [hM _ _]
 
-/-- 1D backward sonic difference $\Delta_- v(z) = v(z) - v(z - 1)$ along borehole depth $z \in \mathbb{Z}$
-(`BeltramiWellLogShell` in `g3vm/engine.py`). -/
-def deltaMinus (v : ℤ → ℝ) (z : ℤ) : ℝ :=
-  v z - v (z - 1)
+def deltaMinus (v : ℤ → ℝ) (z : ℤ) : ℝ := v z - v (z - 1)
+def deltaPlus (v : ℤ → ℝ) (z : ℤ) : ℝ := v z - v (z + 1)
+def morseImpulseProd (v : ℤ → ℝ) (z : ℤ) : ℝ := deltaMinus v z * deltaPlus v z
+def isMorseImpulse (v : ℤ → ℝ) (z : ℤ) : Prop := 0 < morseImpulseProd v z
+noncomputable def laplacian3pt (v : ℤ → ℝ) (z : ℤ) : ℝ := (deltaMinus v z + deltaPlus v z) / 2
 
-/-- 1D forward sonic difference $\Delta_+ v(z) = v(z) - v(z + 1)$ along borehole depth $z \in \mathbb{Z}$. -/
-def deltaPlus (v : ℤ → ℝ) (z : ℤ) : ℝ :=
-  v z - v (z + 1)
-
-/-- 3-point discrete Morse critical-point impulse product
-$$I_{\mathrm{Morse}}(v, z) = \Delta_- v(z) \cdot \Delta_+ v(z) = (v(z) - v(z - 1))(v(z) - v(z + 1)).$$ -/
-def morseImpulseProd (v : ℤ → ℝ) (z : ℤ) : ℝ :=
-  deltaMinus v z * deltaPlus v z
-
-/-- Predicate characterizing a 3-point discrete Morse critical impulse ($I_{\mathrm{Morse}}(v, z) > 0$). -/
-def isMorseImpulse (v : ℤ → ℝ) (z : ℤ) : Prop :=
-  0 < morseImpulseProd v z
-
-/-- 3-point discrete Laplacian spike amplitude estimator
-$$\Delta_{3\mathrm{pt}} v(z) = \frac{\Delta_- v(z) + \Delta_+ v(z)}{2} = v(z) - \frac{v(z - 1) + v(z + 1)}{2}.$$ -/
-noncomputable def laplacian3pt (v : ℤ → ℝ) (z : ℤ) : ℝ :=
-  (deltaMinus v z + deltaPlus v z) / 2
-
-/-- **Theorem 7d (`morseImpulse_iff_strict_extremum`)**:
-The 3-point discrete Morse condition `isMorseImpulse v z` holds if and only if depth $z$ is either
-a strict local sonic peak ($v(z - 1) < v(z)$ and $v(z + 1) < v(z)$) or a strict local sonic trough
-($v(z) < v(z - 1)$ and $v(z) < v(z + 1)$). -/
+/-- **Theorem 2.7d (`morseImpulse_iff_strict_extremum`)**:
+3-point discrete Morse impulse triggers if and only if z is a strict local extremum. -/
 theorem morseImpulse_iff_strict_extremum (v : ℤ → ℝ) (z : ℤ) :
     isMorseImpulse v z ↔
       (v (z - 1) < v z ∧ v (z + 1) < v z) ∨ (v z < v (z - 1) ∧ v z < v (z + 1)) := by
   unfold isMorseImpulse morseImpulseProd deltaMinus deltaPlus
-  rw [mul_pos_iff]
-  simp only [sub_pos, sub_neg]
+  rw [mul_pos_iff]; simp only [sub_pos, sub_neg]
 
-/-- **Theorem 7e (`caliper_morse_rejects_washout_step`)**:
-1. On any single-sided borehole caliper washout step where either flank is flat
-   ($v(z) = v(z - 1)$ or $v(z) = v(z + 1)$), the Morse impulse product vanishes identically
-   (`morseImpulseProd v z = 0`) and `¬ isMorseImpulse v z`.
-2. On any monotone washout ramp or compaction trend
-   ($v(z - 1) \le v(z) \le v(z + 1)$ or $v(z + 1) \le v(z) \le v(z - 1)$),
-   the Morse impulse product is non-positive (`morseImpulseProd v z ≤ 0`) and `¬ isMorseImpulse v z`. -/
+/-- **Theorem 2.7e (`caliper_morse_rejects_washout_step`)**:
+Monotone compaction ramps and single-sided flat steps are strictly rejected. -/
 theorem caliper_morse_rejects_washout_step (v : ℤ → ℝ) (z : ℤ) :
     ((v z = v (z - 1) ∨ v z = v (z + 1)) →
       morseImpulseProd v z = 0 ∧ ¬ isMorseImpulse v z) ∧
@@ -686,26 +487,17 @@ theorem caliper_morse_rejects_washout_step (v : ℤ → ℝ) (z : ℤ) :
       morseImpulseProd v z ≤ 0 ∧ ¬ isMorseImpulse v z) := by
   refine ⟨fun h_flat => ?_, fun h_mono => ?_⟩
   · have h0 : morseImpulseProd v z = 0 := by
-      unfold morseImpulseProd deltaMinus deltaPlus
-      rcases h_flat with h | h <;> { rw [h]; ring }
+      unfold morseImpulseProd deltaMinus deltaPlus; rcases h_flat with h | h <;> { rw [h]; ring }
     exact ⟨h0, by unfold isMorseImpulse; linarith⟩
   · have h_le : morseImpulseProd v z ≤ 0 := by
-      unfold morseImpulseProd deltaMinus deltaPlus
-      rcases h_mono with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> nlinarith
+      unfold morseImpulseProd deltaMinus deltaPlus; rcases h_mono with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> nlinarith
     exact ⟨h_le, by unfold isMorseImpulse; linarith⟩
 
-/-- **Theorem 7f (`caliper_morse_shields_thin_stringer`)**:
-For any thin-bed carbonate, cryogenic water-ice, or high-Ti ilmenite stringer spike embedded in
-background stratum velocity $v_{\mathrm{bg}}$ with $v(z - 1) = v_{\mathrm{bg}}$,
-$v(z + 1) = v_{\mathrm{bg}}$, and $v(z) = v_{\mathrm{bg}} + \delta_{\mathrm{spike}}$
-($\delta_{\mathrm{spike}} \neq 0$), the 3-point discrete Morse operator satisfies
-`morseImpulseProd v z = δ_spike ^ 2`, strictly triggers `isMorseImpulse v z`, and recovers 100% of
-the spike amplitude via `laplacian3pt v z = δ_spike`. -/
+/-- **Theorem 2.7f (`caliper_morse_shields_thin_stringer`)**:
+Thin-bed spike impulses are recovered at 100% amplitude. -/
 theorem caliper_morse_shields_thin_stringer (v : ℤ → ℝ) (z : ℤ) (v_bg δ_spike : ℝ)
-    (h_left : v (z - 1) = v_bg)
-    (h_right : v (z + 1) = v_bg)
-    (h_center : v z = v_bg + δ_spike)
-    (h_nz : δ_spike ≠ 0) :
+    (h_left : v (z - 1) = v_bg) (h_right : v (z + 1) = v_bg)
+    (h_center : v z = v_bg + δ_spike) (h_nz : δ_spike ≠ 0) :
     morseImpulseProd v z = δ_spike ^ 2 ∧
     isMorseImpulse v z ∧
     laplacian3pt v z = δ_spike := by
@@ -714,20 +506,14 @@ theorem caliper_morse_shields_thin_stringer (v : ℤ → ℝ) (z : ℤ) (v_bg δ
   refine ⟨h_prod, by unfold isMorseImpulse; rw [h_prod]; positivity, ?_⟩
   unfold laplacian3pt deltaMinus deltaPlus; rw [h_left, h_right, h_center]; ring
 
-/-! ### Theorem 8 (Family 2.8): 3D Ideal MHD / Stellarator Symmetry-Breaking Isomorphism -/
+/-! ### Theorem 2.8: 3D Ideal MHD / Euler Force Balance Bijection -/
 
-/-- 3D vector cross product $(u \times v)_k$ on $\mathrm{Fin}\,3 \to \mathbb{R}$:
-$$u \times v = (u_1 v_2 - u_2 v_1,\, u_2 v_0 - u_0 v_2,\, u_0 v_1 - u_1 v_0).$$ -/
 def cross3 (u v : Fin 3 → ℝ) (k : Fin 3) : ℝ :=
   match k.val with
   | 0 => u 1 * v 2 - u 2 * v 1
   | 1 => u 2 * v 0 - u 0 * v 2
   | _ => u 0 * v 1 - u 1 * v 0
 
-/-- 3D cyclic Levi-Civita generator tensor $W_{\mathrm{LC}} : \mathrm{Fin}\,3 \to \mathrm{Fin}\,3 \to \mathrm{Fin}\,3 \to \mathbb{R}$
-taking value $1$ on even cyclic triples $(0, 1, 2), (1, 2, 0), (2, 0, 1)$ and $0$ otherwise, so that
-its skew-symmetrization $W_{\mathrm{LC}}(i, j, k) - W_{\mathrm{LC}}(i, k, j) = \varepsilon_{ijk}$
-is the exact 3D Levi-Civita antisymmetric symbol. -/
 def leviCivitaHalfTensor (i j k : Fin 3) : ℝ :=
   match i.val, j.val, k.val with
   | 0, 1, 2 => 1
@@ -735,47 +521,27 @@ def leviCivitaHalfTensor (i j k : Fin 3) : ℝ :=
   | 2, 0, 1 => 1
   | _, _, _ => 0
 
-/-- **Theorem 8a (`cross3_eq_triadOperator`)**:
-For all 3D vector fields $u, v : \mathrm{Fin}\,3 \to \mathbb{R}$ and component $k \in \mathrm{Fin}\,3$,
-the $C = 3$ DarkSnail `triadOperator` with `leviCivitaHalfTensor` is identically the 3D cross product:
-$$B_{W_{\mathrm{LC}}}(u, v)_k = (u \times v)_k.$$
-In particular, both the 3D MHD Lorentz force $\mathbf{J} \times \mathbf{B}$ and the 3D hydrodynamic
-Lamb vector $\boldsymbol{\omega} \times \mathbf{u}$ are exact $C = 3$ instances of `triadOperator`. -/
+/-- **Theorem 2.8a (`cross3_eq_triadOperator`)**:
+$B_{W_{\mathrm{LC}}}(u, v) = u \times v$. -/
 theorem cross3_eq_triadOperator (u v : Fin 3 → ℝ) (k : Fin 3) :
-    triadOperator 3 leviCivitaHalfTensor u v k = cross3 u v k := by
-  fin_cases k <;>
-    simp [triadOperator, Formalization.Analysis.triadOperator, leviCivitaHalfTensor,
-      cross3, Fin.sum_univ_three] <;>
-    ring
+    triadOperator leviCivitaHalfTensor u v k = cross3 u v k := by
+  fin_cases k <;> simp [triadOperator, leviCivitaHalfTensor, cross3, Fin.sum_univ_three] <;> ring
 
-/-- 3D ideal magnetohydrodynamic (MHD) static force-balance predicate
-$$\mathbf{J} \times \mathbf{B} = \nabla p \iff \forall k \in \mathrm{Fin}\,3,\; B_{W_{\mathrm{LC}}}(\mathbf{J}, \mathbf{B})_k = (\nabla p)_k.$$ -/
 def IsIdealMHDBalance (J B grad_p : Fin 3 → ℝ) : Prop :=
-  ∀ k : Fin 3, triadOperator 3 leviCivitaHalfTensor J B k = grad_p k
+  ∀ k : Fin 3, triadOperator leviCivitaHalfTensor J B k = grad_p k
 
-/-- Steady 3D Euler / Beltrami hydrodynamic force-balance predicate
-$$\boldsymbol{\omega} \times \mathbf{u} = -\nabla H \iff \forall k \in \mathrm{Fin}\,3,\; B_{W_{\mathrm{LC}}}(\boldsymbol{\omega}, \mathbf{u})_k = -(\nabla H)_k,$$
-where $\boldsymbol{\omega} = \nabla \times \mathbf{u}$ is vorticity and $H = p + \frac{1}{2}|\mathbf{u}|^2$ is the Bernoulli head. -/
 def IsEulerLambBalance (ω u grad_H : Fin 3 → ℝ) : Prop :=
-  ∀ k : Fin 3, triadOperator 3 leviCivitaHalfTensor ω u k = -grad_H k
+  ∀ k : Fin 3, triadOperator leviCivitaHalfTensor ω u k = -grad_H k
 
-/-- Canonical involutive isomorphism mapping a 3D ideal MHD state $(\mathbf{J}, \mathbf{B}, \nabla p)$
-to its dual steady Euler hydrodynamic state $(\boldsymbol{\omega}, \mathbf{u}, \nabla H) = (\mathbf{J}, \mathbf{B}, -\nabla p)$. -/
 def mhdToEulerMap (state : (Fin 3 → ℝ) × (Fin 3 → ℝ) × (Fin 3 → ℝ)) :
     (Fin 3 → ℝ) × (Fin 3 → ℝ) × (Fin 3 → ℝ) :=
   (state.1, state.2.1, -state.2.2)
 
-/-- `mhdToEulerMap` is a strict involution on 3D force-balance triples. -/
 lemma mhdToEulerMap_involutive : Function.Involutive mhdToEulerMap := by
   rintro ⟨J, B, grad_p⟩; simp [mhdToEulerMap]
 
-/-- **Theorem 8b (`mhd_euler_force_balance_bijection`)**:
-1. The MHD-to-Euler state map `mhdToEulerMap` $(\mathbf{J}, \mathbf{B}, \nabla p) \mapsto (\mathbf{J}, \mathbf{B}, -\nabla p)$
-   is a bijection and an exact involution (`mhdToEulerMap (mhdToEulerMap s) = s`).
-2. A triple $(\mathbf{J}, \mathbf{B}, \nabla p)$ satisfies 3D ideal MHD force balance
-   $\mathbf{J} \times \mathbf{B} = \nabla p$ if and only if its image under `mhdToEulerMap`
-   satisfies steady Euler / Beltrami Lamb-vector balance $\boldsymbol{\omega} \times \mathbf{u} = -\nabla H$,
-   which in turn holds if and only if `cross3 J B k = grad_p k` for all $k \in \mathrm{Fin}\,3$. -/
+/-- **Theorem 2.8b (`mhd_euler_force_balance_bijection`)**:
+Involution and bijection between ideal MHD force balance and steady Euler Lamb balance. -/
 theorem mhd_euler_force_balance_bijection :
     Function.Bijective mhdToEulerMap ∧
     (∀ s : (Fin 3 → ℝ) × (Fin 3 → ℝ) × (Fin 3 → ℝ),
@@ -786,76 +552,43 @@ theorem mhd_euler_force_balance_bijection :
           (mhdToEulerMap (J, B, grad_p)).2.1
           (mhdToEulerMap (J, B, grad_p)).2.2) ∧
     (∀ J B grad_p : Fin 3 → ℝ,
-      IsIdealMHDBalance J B grad_p ↔ (∀ k : Fin 3, cross3 J B k = grad_p k)) := by
-  refine ⟨mhdToEulerMap_involutive.bijective, mhdToEulerMap_involutive,
+      IsIdealMHDBalance J B grad_p ↔ (∀ k : Fin 3, cross3 J B k = grad_p k)) :=
+  ⟨mhdToEulerMap_involutive.bijective, mhdToEulerMap_involutive,
     fun J B grad_p => by simp [IsIdealMHDBalance, IsEulerLambBalance, mhdToEulerMap],
     fun J B grad_p => by simp [IsIdealMHDBalance, cross3_eq_triadOperator]⟩
 
-/-- Magnetic flux-surface tangency (confinement) predicate:
-$$\mathbf{B} \cdot \nabla\psi = \langle \mathbf{B}, \nabla\psi \rangle = 0,$$
-expressing that the magnetic field $\mathbf{B}$ lies everywhere tangent to constant-flux surfaces $\psi = \text{const}$. -/
 def IsFluxSurfaceConfined {C : ℕ} (B grad_ψ : Fin C → ℝ) : Prop :=
-  Formalization.Analysis.shellInner B grad_ψ = 0
+  shellInner B grad_ψ = 0
 
-/-- **Theorem 8c (`mhd_flux_surface_confinement_iff`)**:
-1. Under the generalized MHD / stellarator force-balance relation $\nabla\psi = B_W(u, v)$
-   (identifying active current $u \leftrightarrow \mathbf{J}$ and magnetic field $v \leftrightarrow \mathbf{B}$),
-   tangent flux-surface confinement $\mathbf{B} \cdot \nabla\psi = 0$ is equivalent to triad orthogonality
-   $\langle v, B_W(u, v) \rangle = 0$.
-2. Both `IsFluxSurfaceConfined v (triadOperator C W u v)` in arbitrary mode dimension $C$ and
-   3D magnetic Lorentz orthogonality $\mathbf{B} \cdot (\mathbf{J} \times \mathbf{B}) = 0$ hold
-   identically for all interaction tensors $W$ and fields $u, v, \mathbf{J}, \mathbf{B}$. -/
+/-- **Theorem 2.8c (`mhd_flux_surface_confinement_iff`)**:
+Tangent magnetic flux-surface confinement $\mathbf{B} \cdot \nabla\psi = 0$ is equivalent to triad orthogonality. -/
 theorem mhd_flux_surface_confinement_iff {C : ℕ}
     (W : Fin C → Fin C → Fin C → ℝ) (u v grad_ψ : Fin C → ℝ)
     (J B : Fin 3 → ℝ) :
-    (grad_ψ = triadOperator C W u v →
-      (IsFluxSurfaceConfined v grad_ψ ↔
-        Formalization.Analysis.shellInner v (triadOperator C W u v) = 0)) ∧
-    IsFluxSurfaceConfined v (triadOperator C W u v) ∧
-    Formalization.Analysis.shellInner B (cross3 J B) = 0 := by
-  refine ⟨fun h => h ▸ Iff.rfl, Formalization.Analysis.triad_pointwise_orthogonal W u v, ?_⟩
+    (grad_ψ = triadOperator W u v →
+      (IsFluxSurfaceConfined v grad_ψ ↔ shellInner v (triadOperator W u v) = 0)) ∧
+    IsFluxSurfaceConfined v (triadOperator W u v) ∧
+    shellInner B (cross3 J B) = 0 := by
+  refine ⟨fun h => h ▸ Iff.rfl, triad_pointwise_orthogonal W u v, ?_⟩
   rw [← funext (cross3_eq_triadOperator J B)]
-  exact Formalization.Analysis.triad_pointwise_orthogonal leviCivitaHalfTensor J B
+  exact triad_pointwise_orthogonal leviCivitaHalfTensor J B
 
-/-- Non-stellarator-symmetric (parity-odd $\sin(m\theta - n\zeta)$) triad perturbation shift
-$$\delta z(\tau_0)_k = \tau_0 \cdot B_W(u, v)_k$$
-scaled by the magnetic torsion / non-axisymmetric parity amplitude $\tau_0 \in \mathbb{R}$. -/
 def stellaratorParityShift (C : ℕ) (τ₀ : ℝ) (W : Fin C → Fin C → Fin C → ℝ)
     (u v : Fin C → ℝ) (k : Fin C) : ℝ :=
-  τ₀ * triadOperator C W u v k
+  τ₀ * triadOperator W u v k
 
-/-- Full stellarator Fourier mode readout combining a stellarator-symmetric (parity-even
-$\cos(m\theta - n\zeta)$) baseline $\ell_{\mathrm{sym}}$ with the skew-symmetric parity perturbation
-`stellaratorParityShift`:
-$$\ell_{\mathrm{stell}}(k) = \ell_{\mathrm{sym}}(k) + \tau_0 B_W(u, v)_k.$$ -/
 def stellaratorReadout (C : ℕ) (ℓ_sym : Fin C → ℝ) (τ₀ : ℝ)
     (W : Fin C → Fin C → Fin C → ℝ) (u v : Fin C → ℝ) (k : Fin C) : ℝ :=
   ℓ_sym k + stellaratorParityShift C τ₀ W u v k
 
-/-- **Theorem 8d (`stellarator_parity_breaks_tie_and_conserves_flux`)**:
-Let $\ell_{\mathrm{sym}} : \mathrm{Fin}\,C \to \mathbb{R}$ be any stellarator-symmetric (parity-even)
-baseline readout that ties on two resonant Fourier modes $c_1, c_2$
-($\ell_{\mathrm{sym}}(c_1) = \ell_{\mathrm{sym}}(c_2)$). In a 2-mode resonant collision state
-$v(c_1) = v(c_2) = \alpha > 0$ (and $v(c) = 0$ for $c \notin \{c_1, c_2\}$) driven by active current
-mode $u(i_0) = \beta > 0$ (and $u(i) = 0$ for $i \neq i_0$) with non-stellarator-symmetric torsion
-parameter $\tau_0 > 0$:
-1. **Resonant Mode Tie-Breaking**:
-   $$\ell_{\mathrm{stell}}(c_1) - \ell_{\mathrm{stell}}(c_2) = 2 \tau_0 \beta \alpha \bigl(W(i_0, c_2, c_1) - W(i_0, c_1, c_2)\bigr),$$
-   and whenever $W(i_0, c_2, c_1) > W(i_0, c_1, c_2)$, we strictly have
-   $\ell_{\mathrm{stell}}(c_1) > \ell_{\mathrm{stell}}(c_2)$.
-2. **Tangent Flux-Surface Confinement**:
-   The non-stellarator-symmetric perturbation $\delta z(\tau_0)$ remains strictly tangent to the
-   magnetic flux surface (`IsFluxSurfaceConfined v (stellaratorParityShift C τ₀ W u v)`, i.e.,
-   $\langle v, \delta z(\tau_0) \rangle = 0$). -/
+/-- **Theorem 2.8d (`stellarator_parity_breaks_tie_and_conserves_flux`)**:
+Non-stellarator-symmetric torsion breaks resonant mode ties while preserving flux tangency. -/
 theorem stellarator_parity_breaks_tie_and_conserves_flux {C : ℕ}
     (ℓ_sym : Fin C → ℝ) (τ₀ : ℝ) (W : Fin C → Fin C → Fin C → ℝ)
     (u v : Fin C → ℝ) (i₀ c₁ c₂ : Fin C) (α β : ℝ)
-    (hτ : 0 < τ₀) (hα : 0 < α) (hβ : 0 < β)
-    (h_tie : ℓ_sym c₁ = ℓ_sym c₂)
-    (hu_i0 : u i₀ = β)
-    (hu_other : ∀ i : Fin C, i ≠ i₀ → u i = 0)
-    (hv_c1 : v c₁ = α)
-    (hv_c2 : v c₂ = α)
+    (hτ : 0 < τ₀) (hα : 0 < α) (hβ : 0 < β) (h_tie : ℓ_sym c₁ = ℓ_sym c₂)
+    (hu_i0 : u i₀ = β) (hu_other : ∀ i : Fin C, i ≠ i₀ → u i = 0)
+    (hv_c1 : v c₁ = α) (hv_c2 : v c₂ = α)
     (hv_other : ∀ c : Fin C, c ≠ c₁ → c ≠ c₂ → v c = 0) :
     (stellaratorReadout C ℓ_sym τ₀ W u v c₁ -
       stellaratorReadout C ℓ_sym τ₀ W u v c₂ =
@@ -873,16 +606,12 @@ theorem stellarator_parity_breaks_tie_and_conserves_flux {C : ℕ}
   exact ⟨h_diff, fun hW => by nlinarith [mul_pos (mul_pos hτ hβ) hα],
     tangentTriadStep_orthogonal τ₀ W u v⟩
 
-/-- **Theorem 8e (`stellarator_zero_torsion_homotopy_iff`)**:
-For any non-degenerate triad interaction (`∃ k : Fin C, triadOperator C W u v k ≠ 0`),
-the non-stellarator-symmetric parity shift $\delta z(\tau_0) = \mathrm{stellaratorParityShift}\,C\,\tau_0\,W\,u\,v$
-vanishes if and only if the magnetic torsion parameter vanishes ($\tau_0 = 0 \iff \delta z(\tau_0) = 0$),
-and at $\tau_0 = 0$ the full stellarator readout reduces identically to the stellarator-symmetric
-baseline $\ell_{\mathrm{sym}}$. -/
+/-- **Theorem 2.8e (`stellarator_zero_torsion_homotopy_iff`)**:
+Torsion shift vanishes if and only if $\tau_0 = 0$. -/
 theorem stellarator_zero_torsion_homotopy_iff {C : ℕ}
     (ℓ_sym : Fin C → ℝ) (τ₀ : ℝ) (W : Fin C → Fin C → Fin C → ℝ)
     (u v : Fin C → ℝ)
-    (h_nondeg : ∃ k : Fin C, triadOperator C W u v k ≠ 0) :
+    (h_nondeg : ∃ k : Fin C, triadOperator W u v k ≠ 0) :
     (τ₀ = 0 ↔ stellaratorParityShift C τ₀ W u v = 0) ∧
     (τ₀ = 0 → ∀ k : Fin C, stellaratorReadout C ℓ_sym τ₀ W u v k = ℓ_sym k) := by
   rcases h_nondeg with ⟨k, hk⟩
@@ -890,65 +619,35 @@ theorem stellarator_zero_torsion_homotopy_iff {C : ℕ}
     fun h0 => (mul_eq_zero.mp (congr_fun h0 k)).resolve_right hk⟩,
     fun hτ i => by simp [stellaratorReadout, stellaratorParityShift, hτ]⟩
 
-/-! ### Theorem 9 (Family 2.9): Relaxed-Flow MRxMHD Bernoulli Jump & Cross-Helicity Collinearity -/
+/-! ### Theorem 2.9: Relaxed-Flow MRxMHD Bernoulli Jump & Collinearity -/
 
-/-- Effective Relaxed-Flow MRxMHD Beltrami multiplier
-$$\tilde{\mu}_i = \frac{\mu_i}{1 - M_i^2}$$
-for field-aligned sub-Alfvénic Mach number $M_i$ ($M_i^2 < 1$) from Qu, Dewar, Ebrahimi,
-Anderson, Hudson & Hole (2020, arXiv:2001.06984). -/
-noncomputable def flowBeltramiMultiplier (μ M : ℝ) : ℝ :=
-  μ / (1 - M ^ 2)
+noncomputable def flowBeltramiMultiplier (μ M : ℝ) : ℝ := μ / (1 - M ^ 2)
 
-/-- At zero Mach flow ($M = 0$), the effective flow-Beltrami multiplier reduces identically to
-the static Taylor-Woltjer Beltrami multiplier $\mu$. -/
 theorem sub_alfvenic_beltrami_homotopy_zero_flow (μ : ℝ) :
     flowBeltramiMultiplier μ 0 = μ := by
   unfold flowBeltramiMultiplier; ring
 
-/-- In the sub-Alfvénic elliptic regime ($M^2 < 1$) with positive Beltrami parameter $\mu > 0$,
-the effective Relaxed-Flow MRxMHD multiplier $\tilde{\mu} = \mu / (1 - M^2)$ is strictly positive. -/
 theorem sub_alfvenic_beltrami_pos (μ M : ℝ) (hμ : 0 < μ) (hM : M ^ 2 < 1) :
     0 < flowBeltramiMultiplier μ M :=
   div_pos hμ (by linarith)
 
-/-- Collinear Beltrami current/vorticity/flow field $u_k = \alpha B_k$ (representing either a
-force-free Beltrami current $\mathbf{J} = \tilde{\mu} \mathbf{B}$ or a field-aligned Mach flow
-$\mathbf{v} = M \mathbf{B}$). -/
-def collinearBeltramiField (α : ℝ) (B : Fin 3 → ℝ) (k : Fin 3) : ℝ :=
-  α * B k
+def collinearBeltramiField (α : ℝ) (B : Fin 3 → ℝ) (k : Fin 3) : ℝ := α * B k
 
-/-- **Theorem 9a (`beltrami_cross_helicity_collinear_lorentz_vanishes`)**:
-For any collinear Beltrami current, vorticity, or field-aligned Mach velocity field
-$u = \alpha B$ ($\alpha \in \mathbb{R}$, $B : \mathrm{Fin}\,3 \to \mathbb{R}$), both the 3D
-Levi-Civita `triadOperator` and the 3D vector cross product vanish identically across all
-coordinates $k \in \mathrm{Fin}\,3$:
-$$B_{W_{\mathrm{LC}}}(\alpha \mathbf{B}, \mathbf{B})_k = (\alpha \mathbf{B} \times \mathbf{B})_k = 0.$$
-This guarantees exact force-free interior relaxation ($\mathbf{J}_i \times \mathbf{B}_i = \mathbf{0}$
-and $\mathbf{v}_i \times \mathbf{B}_i = \mathbf{0}$) within each MRxMHD shell $\mathcal{V}_i$. -/
+/-- **Theorem 2.9a (`beltrami_cross_helicity_collinear_lorentz_vanishes`)**:
+$B_{W_{\mathrm{LC}}}(\alpha \mathbf{B}, \mathbf{B}) = \mathbf{0}$. -/
 theorem beltrami_cross_helicity_collinear_lorentz_vanishes (α : ℝ) (B : Fin 3 → ℝ) (k : Fin 3) :
-    triadOperator 3 leviCivitaHalfTensor (collinearBeltramiField α B) B k = 0 ∧
+    triadOperator leviCivitaHalfTensor (collinearBeltramiField α B) B k = 0 ∧
     cross3 (collinearBeltramiField α B) B k = 0 := by
   rw [cross3_eq_triadOperator, and_self_iff]
   fin_cases k <;> simp [cross3, collinearBeltramiField] <;> ring
 
-/-- Generalized Relaxed-Flow MRxMHD Bernoulli pressure-plus-magnetic-plus-kinetic head:
-$$H_{\mathrm{flow}}(p, B^2, M) = p + \frac{(1 + M^2) B^2}{2}.$$ -/
-noncomputable def flowBernoulliHead (p B_sq M : ℝ) : ℝ :=
-  p + (1 + M ^ 2) * B_sq / 2
+noncomputable def flowBernoulliHead (p B_sq M : ℝ) : ℝ := p + (1 + M ^ 2) * B_sq / 2
 
-/-- Interface jump balance predicate across a stepped-pressure MRxMHD transport barrier $\mathcal{I}_i$:
-$$\llbracket p + \tfrac{1}{2}(1 + M^2) B^2 \rrbracket_{\mathcal{I}_i} = 0
-\iff H_{\mathrm{flow}}(p_1, B_1^2, M_1) = H_{\mathrm{flow}}(p_2, B_2^2, M_2).$$ -/
 def IsFlowMRxMHDJumpBalanced (p₁ B₁_sq M₁ p₂ B₂_sq M₂ : ℝ) : Prop :=
   flowBernoulliHead p₁ B₁_sq M₁ = flowBernoulliHead p₂ B₂_sq M₂
 
-/-- **Theorem 9b (`mrxmhd_flow_bernoulli_jump_conservation`)**:
-1. The generalized Flow-MRxMHD interface jump condition `IsFlowMRxMHDJumpBalanced p₁ B₁_sq M₁ p₂ B₂_sq M₂`
-   holds if and only if the plasma pressure jump satisfies
-   $$p_2 - p_1 = \frac{(1 + M_1^2) B_1^2 - (1 + M_2^2) B_2^2}{2}.$$
-2. At zero Alfvénic Mach flow ($M_1 = 0, M_2 = 0$), the Flow-MRxMHD jump condition reduces
-   identically to the static Taylor-Hudson MRxMHD pressure jump
-   $$p_2 - p_1 = \frac{B_1^2 - B_2^2}{2}.$$ -/
+/-- **Theorem 2.9b (`mrxmhd_flow_bernoulli_jump_conservation`)**:
+Interface pressure jump equation across stepped-pressure barriers. -/
 theorem mrxmhd_flow_bernoulli_jump_conservation (p₁ B₁_sq M₁ p₂ B₂_sq M₂ : ℝ) :
     (IsFlowMRxMHDJumpBalanced p₁ B₁_sq M₁ p₂ B₂_sq M₂ ↔
       p₂ - p₁ = ((1 + M₁ ^ 2) * B₁_sq - (1 + M₂ ^ 2) * B₂_sq) / 2) ∧
@@ -958,25 +657,153 @@ theorem mrxmhd_flow_bernoulli_jump_conservation (p₁ B₁_sq M₁ p₂ B₂_sq 
   refine ⟨⟨fun h => by linarith, fun h => by linarith⟩, ⟨fun h => ?_, fun h => ?_⟩⟩ <;>
     { ring_nf at h ⊢; linarith }
 
-/-- KAM Diophantine non-resonance gap measuring the distance of interface rotational transform
-$\iota$ from rational mode $(n, m)$:
-$$\Delta_{\mathrm{KAM}}(\iota, n, m) = \left|\iota - \frac{n}{m}\right|.$$ -/
-noncomputable def kamDiophantineGap (ι : ℝ) (n m : ℕ) : ℝ :=
-  |ι - (n : ℝ) / (m : ℝ)|
+noncomputable def kamDiophantineGap (ι : ℝ) (n m : ℕ) : ℝ := |ι - (n : ℝ) / (m : ℝ)|
 
-/-- KAM interface admissibility predicate for stepped-pressure MRxMHD barriers with flow
-(Qu, Hudson, Dewar, Loizu & Hole, 2021, arXiv:2108.02056), combining sub-Alfvénic PDE ellipticity
-($M^2 < 1$) and the Diophantine non-resonance lower bound $\gamma / m^\nu \le |\iota - n/m|$. -/
 def IsKAMInterfaceAdmissible (ι M γ ν : ℝ) (n m : ℕ) : Prop :=
   M ^ 2 < 1 ∧ γ / ((m : ℝ) ^ ν) ≤ kamDiophantineGap ι n m
 
-/-- **Theorem 9c (`kam_sub_alfvenic_ellipticity_and_gap`)**:
-Every KAM-admissible stepped-pressure interface (`IsKAMInterfaceAdmissible ι M γ ν n m`) strictly
-preserves positive sub-Alfvénic Beltrami ellipticity ($0 < 1 - M^2$) and satisfies the Diophantine
-non-resonance bound $\gamma / m^\nu \le |\iota - n / m|$. -/
+/-- **Theorem 2.9c (`kam_sub_alfvenic_ellipticity_and_gap`)**:
+Sub-Alfvénic Beltrami ellipticity ($1 - M^2 > 0$) and Diophantine non-resonance. -/
 theorem kam_sub_alfvenic_ellipticity_and_gap (ι M γ ν : ℝ) (n m : ℕ)
     (h : IsKAMInterfaceAdmissible ι M γ ν n m) :
     0 < 1 - M ^ 2 ∧ γ / ((m : ℝ) ^ ν) ≤ |ι - (n : ℝ) / (m : ℝ)| :=
   ⟨by linarith [h.1], h.2⟩
 
-end Ultrametric.Analysis.OcclusionTriad
+/-! ### Theorem 2.10a: Online Rank-2 Lie Generator Update & Cayley Rotor Orthogonality -/
+
+/-- 2D Cayley transform matrix for skew-symmetric parameter α:
+$$R(\alpha) = (I - \alpha \Omega)^{-1}(I + \alpha \Omega) =
+  \frac{1}{1 + \alpha^2} \begin{pmatrix} 1 - \alpha^2 & 2\alpha \\ -2\alpha & 1 - \alpha^2 \end{pmatrix}.$$ -/
+noncomputable def cayleyRotor2 (α : ℝ) (i j : Fin 2) : ℝ :=
+  let denom := 1 + α ^ 2
+  let c := (1 - α ^ 2) / denom
+  let s := (2 * α) / denom
+  match i.val, j.val with
+  | 0, 0 => c
+  | 0, 1 => s
+  | 1, 0 => -s
+  | 1, 1 => c
+  | _, _ => 0
+
+/-- **Theorem 2.10a (`cayley_rank2_orthogonality`)**:
+For any skew-symmetric generator parameter $\alpha \in \mathbb{R}$, the Cayley transform
+produces an exact orthogonal rotor satisfying $R^\top R = I_2$ and preserving the Euclidean norm:
+$$\|R(\alpha) x\|_2^2 = \|x\|_2^2.$$ -/
+theorem cayley_rank2_orthogonality (α : ℝ) (x : Fin 2 → ℝ) :
+    (∀ j k : Fin 2, (∑ i : Fin 2, cayleyRotor2 α i j * cayleyRotor2 α i k) = if j = k then 1 else 0) ∧
+    (∑ i : Fin 2, (∑ j : Fin 2, cayleyRotor2 α i j * x j) ^ 2) = (∑ i : Fin 2, x i ^ 2) := by
+  have hdenom : 1 + α ^ 2 ≠ 0 := by positivity
+  have h_alg : ((1 - α ^ 2) / (1 + α ^ 2)) ^ 2 + ((2 * α) / (1 + α ^ 2)) ^ 2 = 1 := by
+    rw [div_pow, div_pow, ← add_div, show (1 - α ^ 2) ^ 2 + (2 * α) ^ 2 = (1 + α ^ 2) ^ 2 by ring,
+        div_self (pow_ne_zero 2 hdenom)]
+  refine ⟨fun j k => ?_, ?_⟩
+  · rw [Fin.sum_univ_two]
+    fin_cases j <;> fin_cases k <;>
+      simp only [cayleyRotor2, Fin.isValue, Fin.coe_ofNat_eq_mod, Nat.zero_mod,
+                 Nat.mod_succ, Fin.mk.injEq, Nat.reduceEqDiff, ↓reduceIte] <;>
+      first | linear_combination h_alg | ring
+  · simp only [Fin.sum_univ_two, cayleyRotor2, Fin.isValue, Fin.coe_ofNat_eq_mod,
+               Nat.zero_mod, Nat.mod_succ]
+    linear_combination (x 0 ^ 2 + x 1 ^ 2) * h_alg
+
+lemma cayleyRotor2_orthonormal (α : ℝ) :
+    ∀ j k : Fin 2, (∑ i : Fin 2, cayleyRotor2 α i j * cayleyRotor2 α i k) = if j = k then 1 else 0 :=
+  (cayley_rank2_orthogonality α 0).1
+
+/-- Stealth domain-native alias for Theorem 2.10a. -/
+theorem cayley_rotor_orthogonality (α : ℝ) (x : Fin 2 → ℝ) :
+    (∀ j k : Fin 2, (∑ i : Fin 2, cayleyRotor2 α i j * cayleyRotor2 α i k) = if j = k then 1 else 0) ∧
+    (∑ i : Fin 2, (∑ j : Fin 2, cayleyRotor2 α i j * x j) ^ 2) = (∑ i : Fin 2, x i ^ 2) :=
+  cayley_rank2_orthogonality α x
+
+/-! ### Theorem 2.10b: SE(2) Contact Sheaf Unilateral Non-Penetration Invariant -/
+
+def contactNormalCoboundary (nx ny dvx dvy : ℝ) : ℝ := nx * dvx + ny * dvy
+def contactTangentCoboundary (nx ny dvx dvy : ℝ) : ℝ := -ny * dvx + nx * dvy
+
+/-- **Theorem 2.10b (`contact_sheaf_non_penetration_invariant`)**:
+For any contact edge with unit normal $\mathbf{n} = (n_x, n_y)$ ($n_x^2 + n_y^2 = 1$):
+1. Relative velocity decomposes orthogonally: $(\Delta v_x)^2 + (\Delta v_y)^2 = (\delta v)_n^2 + (\delta v)_t^2$.
+2. Normal coboundary $(\delta v)_n \ge 0$ guarantees unilateral non-penetration (interpenetration rate $\le 0$).
+3. Preserves unconstrained tangential sliding degrees of freedom. -/
+theorem contact_sheaf_non_penetration_invariant (nx ny dvx dvy : ℝ)
+    (h_unit : nx ^ 2 + ny ^ 2 = 1) :
+    (dvx ^ 2 + dvy ^ 2 =
+      contactNormalCoboundary nx ny dvx dvy ^ 2 +
+      contactTangentCoboundary nx ny dvx dvy ^ 2) ∧
+    (contactNormalCoboundary nx ny dvx dvy ≥ 0 →
+      -(contactNormalCoboundary nx ny dvx dvy) ≤ 0) ∧
+    (∀ (vn vt : ℝ), vn ≥ 0 →
+      let dvx' := vn * nx - vt * ny
+      let dvy' := vn * ny + vt * nx
+      contactNormalCoboundary nx ny dvx' dvy' = vn ∧
+      contactTangentCoboundary nx ny dvx' dvy' = vt) := by
+  refine ⟨by unfold contactNormalCoboundary contactTangentCoboundary;
+             linear_combination -(dvx ^ 2 + dvy ^ 2) * h_unit,
+          fun h => by linarith, fun vn vt _ => ?_⟩
+  unfold contactNormalCoboundary contactTangentCoboundary
+  exact ⟨by linear_combination vn * h_unit, by linear_combination vt * h_unit⟩
+
+/-- Stealth domain-native alias for Theorem 2.10b. -/
+theorem contact_sheaf_unilateral_non_penetration (nx ny dvx dvy : ℝ)
+    (h_unit : nx ^ 2 + ny ^ 2 = 1) :
+    (dvx ^ 2 + dvy ^ 2 =
+      contactNormalCoboundary nx ny dvx dvy ^ 2 +
+      contactTangentCoboundary nx ny dvx dvy ^ 2) ∧
+    (contactNormalCoboundary nx ny dvx dvy ≥ 0 →
+      -(contactNormalCoboundary nx ny dvx dvy) ≤ 0) ∧
+    (∀ (vn vt : ℝ), vn ≥ 0 →
+      let dvx' := vn * nx - vt * ny
+      let dvy' := vn * ny + vt * nx
+      contactNormalCoboundary nx ny dvx' dvy' = vn ∧
+      contactTangentCoboundary nx ny dvx' dvy' = vt) :=
+  contact_sheaf_non_penetration_invariant nx ny dvx dvy h_unit
+
+/-! ### Theorem 2.11: Broadcom BCM2712 SRAM Arena Layout Alignment & Boundedness -/
+
+/-- Sub-buffer starting byte offsets inside TriadUniversalArena. -/
+def arenaOffsets : Fin 7 → ℕ
+  | 0 => 0        -- 0: Skew Triad tensor & state (0..64KB)
+  | 1 => 65536    -- 1: Cascade 16-step buffer (64KB..128KB)
+  | 2 => 131072   -- 2: SO(16) Cayley Rotor (128KB..192KB)
+  | 3 => 196608   -- 3: Beltrami Morse ring buffer & stack (192KB..720KB)
+  | 4 => 720896   -- 4: SO(6) Kelvin-Mandel stiffness (720KB..786KB)
+  | 5 => 786432   -- 5: SE(2) Contact Sheaf graph (786KB..917KB)
+  | 6 => 917504   -- 6: Working state & telemetry scratch (917KB..1048KB)
+
+/-- Sub-buffer partition byte sizes inside TriadUniversalArena. -/
+def arenaSizes : Fin 7 → ℕ
+  | 0 => 65536
+  | 1 => 65536
+  | 2 => 65536
+  | 3 => 524288
+  | 4 => 65536
+  | 5 => 131072
+  | 6 => 131072
+
+/-- Maximum SRAM arena ceiling budget (bytes). -/
+def arenaTotalBound : ℕ := 1258291
+
+/-- Broadcom BCM2712 Cortex-A76 L3 SRAM cache size (2.0 MB). -/
+def sramL3Ceiling : ℕ := 2097152
+
+/-- **Theorem 2.11 (`sram_arena_layout_verified`)**:
+All sub-buffers inside `TriadUniversalArena` satisfy:
+1. 64-byte cache-line alignment (`offset % 64 == 0`).
+2. Pairwise byte-disjointness (`offset_i + size_i ≤ offset_j` for $i < j$).
+3. Strict memory footprint bound inside $\le 1,258,291\text{ B} < 2.0\text{ MB}$ ($2,097,152\text{ B}$) SRAM. -/
+theorem sram_arena_layout_verified :
+    (∀ i : Fin 7, arenaOffsets i % 64 = 0) ∧
+    (∀ i j : Fin 7, i.val < j.val → arenaOffsets i + arenaSizes i ≤ arenaOffsets j) ∧
+    (arenaOffsets 6 + arenaSizes 6 ≤ arenaTotalBound ∧ arenaTotalBound < sramL3Ceiling) := by
+  refine ⟨fun i => by fin_cases i <;> rfl, fun i j hij => ?_, by decide⟩
+  fin_cases i <;> fin_cases j <;> (try revert hij; decide)
+
+/-- Stealth domain-native alias for Theorem 2.11. -/
+theorem sram_arena_cacheline_disjoint_and_bounded :
+    (∀ i : Fin 7, arenaOffsets i % 64 = 0) ∧
+    (∀ i j : Fin 7, i.val < j.val → arenaOffsets i + arenaSizes i ≤ arenaOffsets j) ∧
+    (arenaOffsets 6 + arenaSizes 6 ≤ arenaTotalBound ∧ arenaTotalBound < sramL3Ceiling) :=
+  sram_arena_layout_verified
+
+end TriadCore

@@ -1652,11 +1652,11 @@ footer {
     </div>
     <div class="thm-group">
       <span style="color:var(--text-muted); font-size:7.5px; font-weight:800;">LIT:</span>
-      <a class="lit-badge" href="https://arxiv.org/abs/2110.13389" target="_blank" title="Wang et al. (2021) - Normalized Gaussian Wasserstein for Tiny Object Detection">Wang 2021 (W1)</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2203.14360" target="_blank" title="Cao et al. (2022) - Observation-Centric SORT: Kalman Lag & Occlusion">OC-SORT 2022</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2110.06864" target="_blank" title="Zhang et al. (2021) - ByteTrack: Associating Every Detection Box">ByteTrack 2021</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2408.09615" target="_blank" title="LimitIRSTD (2024) - Resource-Limited Infrared Small Target Detection">LimitIRSTD 2024</a>
-      <a class="lit-badge" href="https://arxiv.org/abs/2610.07561" target="_blank" title="LARK - Low-Cost Occlusion-Resilient Kalman System">LARK 2026</a>
+      <a class="lit-badge" href="#lit-2110-13389" data-url="https://arxiv.org/abs/2110.13389" title="Wang et al. (2021) - Normalized Gaussian Wasserstein for Tiny Object Detection">Wang 2021 (W1)</a>
+      <a class="lit-badge" href="#lit-2203-14360" data-url="https://arxiv.org/abs/2203.14360" title="Cao et al. (2022) - Observation-Centric SORT: Kalman Lag & Occlusion">OC-SORT 2022</a>
+      <a class="lit-badge" href="#lit-2110-06864" data-url="https://arxiv.org/abs/2110.06864" title="Zhang et al. (2021) - ByteTrack: Associating Every Detection Box">ByteTrack 2021</a>
+      <a class="lit-badge" href="#lit-2408-09615" data-url="https://arxiv.org/abs/2408.09615" title="LimitIRSTD (2024) - Resource-Limited Infrared Small Target Detection">LimitIRSTD 2024</a>
+      <a class="lit-badge" href="#lit-2610-07561" data-url="https://arxiv.org/abs/2610.07561" title="LARK - Low-Cost Occlusion-Resilient Kalman System">LARK 2026</a>
     </div>
   </div>
 </footer>
@@ -1776,6 +1776,8 @@ class TrackerArena {
     // Scratch statistical buffers (zero GC allocation during streaming)
     this.statSamples256 = new Float32Array(256);
     this.statDevs256 = new Float32Array(256);
+    this.morseHistory = new Float32Array(256);
+    this.isMorseCritical = false;
     this.histX = new Float32Array(w);
     this.histY = new Float32Array(h);
 
@@ -1828,6 +1830,8 @@ class TrackerArena {
     this.tieBreakGap = 0.0;
     this.orthoErr = 0.0;
     this.radialDrift = 0.0;
+    this.morseHistory.fill(0);
+    this.isMorseCritical = false;
   }
 
   getRingFrame(offsetBack) {
@@ -3343,6 +3347,19 @@ function runDarkSnailTrackerStep(arena) {
 
   STATE.classification = dominantGateState;
   STATE.pendingImpulse = (dominantGateState === 'pending_impulse');
+
+  // --- Causal 3-Point Discrete Morse Ring-Buffer Indexing (Theorems 2.7 / 2.11) ---
+  // Capacity N = 256; safe causal indexing: (hIdx + 255) % 256 for (t - 1), (hIdx + 254) % 256 for (t - 2)
+  const morseSample = activeTracks.length > 0 ? (activeTracks[0].nis || 0.0) : 0.0;
+  const hIdx = STATE.frameIdx % 256;
+  arena.morseHistory[hIdx] = morseSample;
+
+  const midSample = arena.morseHistory[(hIdx + 255) % 256];
+  const prev2Sample = arena.morseHistory[(hIdx + 254) % 256];
+  const dMinus = midSample - prev2Sample;
+  const dPlus = midSample - morseSample;
+  const isMorseCritical = STATE.frameIdx >= 2 && (dMinus * dPlus > 0);
+  arena.isMorseCritical = isMorseCritical;
 
   // Dynamic Track Lifecycle & Synthetic Decoy Swarm Injection for Live WebRTC / Blind Video/Y8 Streams
   if (isDynamicTracks) {

@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0.0",
+  "verifier": "Broadcom BCM2712 Cortex-A76 Hardware Cache Verifier (scripts/verify_bcm2712_arena.py)",
+  "timestamp_utc": "2026-10-25T18:36:12Z",
+  "hardware_target": "Broadcom BCM2712 (Raspberry Pi 5)",
+  "cpu_core": "ARM Cortex-A76 (ARMv8.2-A)",
+  "bcm2712_cache_geometry": {
+    "hardware_target": "Broadcom BCM2712 (Raspberry Pi 5)",
+    "cpu_core": "ARM Cortex-A76 (ARMv8.2-A)",
+    "clock_mhz": 2400,
+    "line_size_bytes": 64,
+    "l1d": {
+      "size_bytes": 65536,
+      "size_kb": 64,
+      "ways": 4,
+      "sets": 256,
+      "line_size_bytes": 64,
+      "policy": "Pseudo-LRU / Tree-PLRU (4-way)"
+    },
+    "l2": {
+      "size_bytes": 524288,
+      "size_kb": 512,
+      "ways": 8,
+      "sets": 1024,
+      "line_size_bytes": 64,
+      "policy": "Pseudo-LRU (8-way private per core)"
+    },
+    "l3": {
+      "size_bytes": 2097152,
+      "size_mb": 2.0,
+      "ways": 16,
+      "sets": 2048,
+      "line_size_bytes": 64,
+      "policy": "Pseudo-LRU / True LRU (16-way shared LLd)"
+    }
+  },
+  "arenas": {
+    "stylo": {
+      "arena_struct": "TrackerStateArena",
+      "spoke": "stylo",
+      "description": "Optical 6-DOF GNC Autonomous Intercept Video Tracking Fixed SRAM Arena",
+      "arena_size_bytes": 673792,
+      "arena_size_kb": 658.0,
+      "arena_max_ceiling_bytes": 1572864,
+      "arena_alignment_bytes": 64,
+      "total_references": 50000000,
+      "simulation_wall_time_sec": 1.5037,
+      "throughput_refs_per_sec": 33250223.3,
+      "l1d": {
+        "hits": 32674125,
+        "misses": 17325875,
+        "hit_rate_pct": 65.35
+      },
+      "l2": {
+        "hits": 15514451,
+        "misses": 1811424,
+        "hit_rate_pct": 89.54
+      },
+      "l3": {
+        "hits": 1800896,
+        "misses": 10528,
+        "hit_rate_pct": 99.42
+      },
+      "lld_miss_rate_pct": 0.02106,
+      "target_lld_miss_rate_pct": 0.05,
+      "target_achieved": true,
+      "allocator_static_audit": {
+        "audited": true,
+        "target_binary": "c:/Users/x/Documents/antigravity/stylo/rust/darksnail_tracker_rs/target/release/darksnail_tracker_rs.dll",
+        "heap_allocators_imported": [],
+        "stepping_symbols_verified": [
+          "tracker_step_frame",
+          "beltrami_exterior_curl_and_medoids_f32",
+          "temporal_continuity_clock_split_f32",
+          "skew_symmetric_triad_cascade_step_f32",
+          "innovation_spike_gate_step_f32"
+        ],
+        "stealth_symbols_verified": [
+          "tracker_arena_new",
+          "tracker_arena_free",
+          "tracker_arena_reset",
+          "tracker_get_arena_size_bytes",
+          "tracker_get_clock_mask",
+          "tracker_get_nope_mask",
+          "tracker_get_salience_map"
+        ],
+        "dynamic_allocations_detected": 0,
+        "status": "ZERO_DYNAMIC_ALLOCATIONS_VERIFIED"
+      }
+    }
+  },
+  "summary": {
+    "total_arenas_verified": 1,
+    "total_references_simulated": 50000000,
+    "mean_lld_miss_rate_pct": 0.02106,
+    "max_lld_miss_rate_pct": 0.02106,
+    "target_threshold_pct": 0.05,
+    "all_cache_targets_passed": true,
+    "all_allocator_audits_passed": true,
+    "overall_verification_status": "PASS"
+  }
+}

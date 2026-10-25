@@ -7,13 +7,18 @@ description = "Allocation-free #![no_std] Rust SIMD and WASM high-speed video tr
 license = "CC0-1.0"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "rlib", "staticlib"]
+doctest = false
 
 [features]
-default = ["std"]
+default = []
 std = []
+
+[profile.dev]
+panic = "abort"
 
 [profile.release]
 opt-level = 3
 lto = true
 codegen-units = 1
+panic = "abort"
