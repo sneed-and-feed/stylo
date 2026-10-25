@@ -1,5 +1,6 @@
 {
   "mission_requirement": "R4.2 Zero-Weight Optical Terminal 6-DOF GNC",
+  "timestamp_utc": "2026-10-25T21:23:53Z",
   "initial_range_m": 500.0,
   "final_miss_distance_m": 0.04956131588019594,
   "final_docking_speed_m_s": 0.015531463995454697,

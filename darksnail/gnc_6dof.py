@@ -579,8 +579,11 @@ def run_6dof_terminal_intercept(
     final_miss_distance = float(plant.range)
     final_docking_speed = float(plant.speed)
 
+    import time
+
     summary: Dict[str, Any] = {
         "mission_requirement": "R4.2 Zero-Weight Optical Terminal 6-DOF GNC",
+        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "initial_range_m": float(initial_range),
         "final_miss_distance_m": final_miss_distance,
         "final_docking_speed_m_s": final_docking_speed,
